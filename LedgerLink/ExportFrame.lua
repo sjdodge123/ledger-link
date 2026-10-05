@@ -93,6 +93,8 @@ function ExportFrame.Show(section, textOrPages, footerText)
     if not frame then create() end
     pages = type(textOrPages) == "table" and textOrPages or { textOrPages }
     pageIndex, currentSection, footer = 1, section, footerText
+    -- One window at a time: the panel steps aside for the export.
+    if ns.Panel then ns.Panel.Hide() end
     frame:Show()
     render()
 end

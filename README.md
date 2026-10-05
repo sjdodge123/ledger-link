@@ -179,7 +179,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `C_ClassTalents.GetActiveConfigID`, `C_Traits.GetConfigInfo/GetTreeNodes/GetNodeInfo/GenerateImportString` | talent node count in the import preview | `talents.nodes` empty |
 | `GetNumSavedInstances` / `GetSavedInstanceInfo` (14th return `instanceId`) | lockouts in the import preview | lockout rows without an instance id are skipped |
 | `## IconTexture` + uncompressed 32-bit TGA textures | Ledger Link shows its icon in the AddOns list (not the red "?"); the minimap button shows the round icon | default "?" icon / blank minimap button |
-| `UICheckButtonTemplate`, minimap textures (`MiniMap-TrackingBorder`, `UI-Minimap-Background`, `UI-Minimap-ZoomButton-Highlight`), `GetCursorPosition` | the panel checkbox and the minimap button look right and drag | cosmetic only |
+| `UICheckButtonTemplate`, `Interface\\ChatFrame\\ChatFrameBackground` (window fill), minimap textures (`MiniMap-TrackingBorder`, `UI-Minimap-Background`, `UI-Minimap-ZoomButton-Highlight`), `GetCursorPosition` | the panel checkbox and the minimap button look right and drag | cosmetic only |
 | `BackdropTemplate`, `UIPanelScrollFrameTemplate`, `UIPanelButtonTemplate`, `UIPanelCloseButton` | the export window looks right | falls back to a plain frame (no border) |
 | Very long strings in an `EditBox` | Ctrl+A / Ctrl+C on the biggest guild page | lower `Guild.MEMBERS_PER_PAGE` (250) |
 | Requesting the roster from an addon (`C_GuildInfo.GuildRoster()`) | **not the cause** of the beta popup (alpha5 still showed it); the addon no longer requests the roster anyway: the client has it after login | the export waits for the roster the Guild window loads (`GUILD_ROSTER_UPDATE`) |

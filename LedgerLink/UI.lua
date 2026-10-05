@@ -6,8 +6,10 @@ local _, ns = ...
 local UI = {}
 ns.UI = UI
 
+-- Solid dark fill (SetBackdropColor below) instead of the translucent dialog
+-- background: beta feedback, overlapping windows were hard to tell apart.
 local BACKDROP = {
-    bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+    bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
     tile = true, tileSize = 32, edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 },
@@ -25,7 +27,10 @@ function UI.Window(name, width, height)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    if f.SetBackdrop then f:SetBackdrop(BACKDROP) end
+    if f.SetBackdrop then
+        f:SetBackdrop(BACKDROP)
+        f:SetBackdropColor(0.05, 0.05, 0.07, 0.95)
+    end
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -6, -6)
     if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, name) end
