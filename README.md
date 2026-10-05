@@ -176,5 +176,8 @@ it builds `LedgerLink-<tag>.zip` and attaches it to a GitHub Release; tags
 containing `alpha`/`beta` are pre-releases. CI also builds the zip on every push
 without uploading and runs `tools/check-package-layout.sh`, which fails unless
 the zip holds only `LedgerLink/LedgerLink.toc`, the files it loads, LICENSE and the generated CHANGELOG.md.
-CurseForge/Wago uploads stay off until the `CF_API_KEY` / `WAGO_API_TOKEN`
-secrets and the `## X-Curse-Project-ID` / `## X-Wago-ID` .toc lines exist.
+The version in the .toc and `ns.VERSION` is `@project-version@`, which the
+packager replaces with the tag (the layout check fails if any keyword is left).
+CurseForge uploads are on (project 1728299, `CF_API_KEY` secret). Wago stays off
+until the `WAGO_API_TOKEN` secret and a `## X-Wago-ID` .toc line exist.
+Listing artwork and copy live in `media/` (not packaged).

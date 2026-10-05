@@ -2,7 +2,7 @@
 local addonName, ns = ...
 
 ns.NAME = addonName
-ns.VERSION = "0.1.0" -- keep in sync with ## Version in LedgerLink.toc
+ns.VERSION = "@project-version@" -- the packager substitutes the release tag (also ## Version in the .toc)
 
 local RULESET_ALIASES = {
     normal = "normal", pvp = "pvp", hardcore = "hardcore", hc = "hardcore",
