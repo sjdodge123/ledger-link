@@ -26,13 +26,6 @@ local function rosterCount()
     return math.min(n, MAX_ROSTER_SCAN)
 end
 
-local function requestRoster()
-    if type(C_GuildInfo) == "table" and C_GuildInfo.GuildRoster then
-        ns.SafeCall(C_GuildInfo.GuildRoster)
-    else
-        ns.SafeCall(GuildRoster)
-    end
-end
 
 local function lastOnlineDays(i, online)
     if online then return nil end
@@ -156,16 +149,18 @@ end
 
 local pending
 
---- Ask the server for a fresh roster; export now if one is cached, else on
---- the next GUILD_ROSTER_UPDATE.
+--- Export now if the client has the roster, else on the next
+--- GUILD_ROSTER_UPDATE. The addon never requests the roster itself: on the
+--- beta, C_GuildInfo.GuildRoster() from an addon raised "blocked from an action
+--- only available to the Blizzard UI" (2026-10-05). Opening the Guild window
+--- makes the game load it.
 function Guild.Prepare(done)
-    requestRoster()
     if rosterCount() > 0 or not ns.SafeCall(GetGuildInfo, "player") then
         done()
         return
     end
     pending = done
-    ns.Print("Loading the guild roster...")
+    ns.Print("The guild roster isn't loaded yet: open the Guild window (J) and the export will open.")
 end
 
 function Guild.OnEvent(event)

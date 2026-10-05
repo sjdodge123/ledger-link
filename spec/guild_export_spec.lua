@@ -174,18 +174,33 @@ describe("guild export", function()
         assert.truthy(text:find("3 roster row%(s%) were unreadable"))
     end)
 
-    it("waits for GUILD_ROSTER_UPDATE when the roster is not loaded yet", function()
+    -- Beta 2026-10-05: /rl export guild raised "LedgerLink has been blocked
+    -- from an action only available to the Blizzard UI" (and every button on
+    -- that popup crashed the client). By elimination (probe + char export used
+    -- the same window and roster reads without it) the trigger is the roster
+    -- request, so the addon never requests the roster itself.
+    it("never asks the server for the roster (C_GuildInfo.GuildRoster / GuildRoster)", function()
+        _G.GuildRoster = function() WowStub.state.rosterRequests = WowStub.state.rosterRequests + 1 end
+        SlashCmdList.LEDGERLINK("export guild")
+        WowStub.state.guildRoster = {}
+        SlashCmdList.LEDGERLINK("export guild")
+        ns.Guild.OnEvent("GUILD_ROSTER_UPDATE")
+        _G.GuildRoster = nil
+        assert.equals(0, WowStub.state.rosterRequests)
+    end)
+
+    it("asks the player to open the Guild window when the roster is not loaded, then exports", function()
         local rows = WowStub.state.guildRoster
         WowStub.state.guildRoster = {}
         SlashCmdList.LEDGERLINK("export guild")
-        assert.equals(1, WowStub.state.rosterRequests)
-        assert.truthy(WowStub.printed[#WowStub.printed]:find("Loading the guild roster"))
+        assert.truthy(WowStub.printed[#WowStub.printed]:find("open the Guild window", 1, true))
         assert.is_nil(LedgerLinkDB.lastExport.guild)
-        WowStub.state.guildRoster = rows
+        WowStub.state.guildRoster = rows -- opening the Guild window loads it
         ns.Guild.OnEvent("GUILD_ROSTER_UPDATE")
         assert.truthy(ns.ExportFrame.GetText():match("^!RL1!guild!"))
+        local shownAt = #WowStub.printed
         ns.Guild.OnEvent("GUILD_ROSTER_UPDATE") -- a later update does not re-open it
-        assert.equals(1, WowStub.state.rosterRequests)
+        assert.equals(shownAt, #WowStub.printed)
     end)
 
     it("refuses when not in a guild", function()
