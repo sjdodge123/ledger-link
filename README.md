@@ -175,6 +175,6 @@ Pushing a `v*` tag runs `.github/workflows/release.yml` (BigWigsMods packager):
 it builds `LedgerLink-<tag>.zip` and attaches it to a GitHub Release; tags
 containing `alpha`/`beta` are pre-releases. CI also builds the zip on every push
 without uploading and runs `tools/check-package-layout.sh`, which fails unless
-the zip holds only `LedgerLink/LedgerLink.toc`, the files it loads, and LICENSE.
+the zip holds only `LedgerLink/LedgerLink.toc`, the files it loads, LICENSE and the generated CHANGELOG.md.
 CurseForge/Wago uploads stay off until the `CF_API_KEY` / `WAGO_API_TOKEN`
 secrets and the `## X-Curse-Project-ID` / `## X-Wago-ID` .toc lines exist.
