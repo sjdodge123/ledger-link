@@ -93,15 +93,31 @@ table.sort(originals, function(a, b) return #a > #b end)
 
 local function escapePattern(s) return (s:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")) end
 
+-- Every string VALUE in the anonymised JSON (keys excluded), checked whole and
+-- word by word (split on spaces and "-"), so "First Surname-Realm" can't hide a
+-- surviving part. Reports where, never the personal string itself.
+local isOriginal = {}
+for _, orig in ipairs(originals) do isOriginal[orig] = true end
+local function assertNoLeak(json, page)
+    local function check(v, path)
+        if type(v) == "table" then
+            for k, child in pairs(v) do check(child, path .. "." .. tostring(k)) end
+        elseif type(v) == "string" then
+            local leak = isOriginal[v]
+            for word in v:gmatch("[^%s%-]+") do leak = leak or isOriginal[word] end
+            if leak then error(string.format("a personal string survived in page %d at %s", page, path), 0) end
+        end
+    end
+    check(require("dkjson").decode(json), "")
+end
+
 local out = {}
 for i, page in ipairs(pages) do
     local json = page.d.json
     for _, orig in ipairs(originals) do
         json = json:gsub('"' .. escapePattern(orig) .. '"', '"' .. map[orig]:gsub("%%", "%%%%") .. '"')
     end
-    for _, orig in ipairs(originals) do
-        assert(not json:find(orig, 1, true), "personal string survived anonymisation in page " .. i)
-    end
+    assertNoLeak(json, i)
     local header = page.token:match("^(!RL%d+![^!]+!)")
     local body = base64.encode(LibDeflate:CompressZlib(json))
     out[i] = header .. body
