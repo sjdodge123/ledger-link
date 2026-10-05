@@ -14,6 +14,7 @@ data, compresses it, and shows it in a box you copy from.
 /rl raid clear       forget recorded pulls
 /rl guildnotes on|off  include PUBLIC notes in the guild export (default off)
 /rl ruleset normal|pvp|rp|hardcore           tell the export your ruleset
+/rl region us|eu|kr|tw|cn   your region; only used when the game doesn't report one (beta)
 /rl status           last export times + recorded pull count
 ```
 
@@ -44,7 +45,8 @@ Details!/DBM-style log parsing is impossible in-game.
    (you should end up with `AddOns/LedgerLink/LedgerLink.toc`).
 2. In game, `/reload` (or log in), and make sure **Ledger Link** is ticked in
    the AddOns list on the character screen.
-3. `/rl ruleset normal` (or `pvp`, `rp`, `hardcore`) once per character.
+3. `/rl ruleset normal` (or `pvp`, `rp`, `hardcore`) once per character. On the beta
+   also `/rl region us` (or `eu`, `kr`, `tw`, `cn`) once: the beta client reports a test region.
 4. `/rl export char`, then Ctrl+C (the text is pre-selected; **Select all**
    re-selects it).
 5. In Raid Ledger: your character -> **Import string** -> paste.
@@ -144,11 +146,11 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 
 | API / behaviour | What to check | If wrong |
 |---|---|---|
-| `## Interface: 16001` | `/dump select(4, GetBuildInfo())` | addon shows "out of date" |
+| `## Interface: 16001` | **confirmed** on beta build 1.60.1.70205 (2026-10-05) | addon shows "out of date" |
 | `C_EncodingUtil.CompressString(s, Enum.CompressionMethod.Zlib, Enum.CompressionLevel.OptimizeForSize)` | export works at all | "C_EncodingUtil is missing" / "Compression failed" |
 | `C_EncodingUtil.EncodeBase64` alphabet + padding | string pastes cleanly | URL-safe / unpadded output is normalised to standard padded either way |
-| `GetCurrentRegion()` returns 1-5 | `/dump GetCurrentRegion()` | export refuses with "Couldn't read your region" |
-| `UnitGUID("player")` is `Player-<n>-<8 hex>` | `/dump UnitGUID("player")` | export refuses with "Unexpected player GUID format" |
+| `GetCurrentRegion()` returns 1-5 | **no on the beta**: it returns `90`; `GetCurrentRegionName()` is `""` and the `portal` CVar is `"test"` (2026-10-05) | outside 1-5 the player's `/rl region` choice is sent; without one the export asks for it. Live clients are expected to return 1-5 |
+| `UnitGUID("player")` is `Player-<n>-<8 hex>` | **confirmed** on the beta (2026-10-05) | export refuses with "Unexpected player GUID format" |
 | `GetUnitName("player", true)` returns "First Surname" | `/dump GetUnitName("player", true)` | `fullName` falls back to `UnitFullName` |
 | `GetRealmName()` on a realmless client | `/dump GetRealmName()` | stored raw only; the server ignores it |
 | No ruleset API exists | - | set it with `/rl ruleset`; otherwise `null` |

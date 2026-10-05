@@ -26,6 +26,7 @@ local HELP = {
     "/rl raid clear - forget recorded boss pulls",
     "/rl guildnotes on|off - include public notes in the guild export (default off)",
     "/rl ruleset normal|pvp|rp|hardcore - set this character's ruleset",
+    "/rl region us|eu|kr|tw|cn - your region, only needed where the client doesn't report one (beta)",
     "/rl status - show the last export times",
     "Paste the string into Raid Ledger: your character -> Import string.",
 }
@@ -45,6 +46,15 @@ local function setRuleset(arg)
     ns.Print("Ruleset set to " .. ruleset .. ".")
 end
 
+local function setRegion(arg)
+    if not ns.Identity.REGIONS[arg or ""] then
+        ns.Print("Usage: /rl region us|eu|kr|tw|cn")
+        return
+    end
+    LedgerLinkDB.region = arg
+    ns.Print("Region set to " .. arg .. ". It is only used when the game doesn't report one (the beta).")
+end
+
 local function showStatus()
     local any = false
     for section, info in pairs(LedgerLinkDB.lastExport) do
@@ -55,6 +65,7 @@ local function showStatus()
     if not any then ns.Print("No exports yet. Try /rl export char") end
     ns.Print(string.format("Recorded boss pulls: %d (max %d)", #ns.Raid.Pulls(), ns.Raid.MAX_PULLS))
     ns.Print("Ruleset: " .. (LedgerLinkCharDB.ruleset or "not set (/rl ruleset)"))
+    if LedgerLinkDB.region then ns.Print("Region: " .. LedgerLinkDB.region .. " (used if the game doesn't report one)") end
 end
 
 local function inCombat()
@@ -111,6 +122,8 @@ function ns.HandleSlash(msg)
         runExport(rest ~= "" and rest or "char")
     elseif cmd == "ruleset" then
         setRuleset(rest)
+    elseif cmd == "region" then
+        setRegion(rest)
     elseif cmd == "status" then
         showStatus()
     elseif cmd == "guildnotes" then
