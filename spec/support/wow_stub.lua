@@ -186,6 +186,7 @@ local function newWidget(kind, name)
     return setmetatable(w, { __index = function(self, key)
         if key == "SetScript" then return function(_, ev, fn) self.scripts[ev] = fn end end
         if key == "RegisterEvent" then return function(_, ev) self.events[ev] = true end end
+        if key == "SetFocus" then return function() WowStub.focusCalls = WowStub.focusCalls + 1 end end
         if key == "SetText" then return function(_, t) self.text = t end end
         if key == "GetText" then return function() return self.text end end
         if key == "Show" then return function() self.shown = true end end
@@ -195,6 +196,7 @@ local function newWidget(kind, name)
     end })
 end
 WowStub.frames = {}
+WowStub.focusCalls = 0
 _G.CreateFrame = function(kind, name)
     local w = newWidget(kind, name)
     if name then WowStub.frames[name] = w; _G[name] = w end
