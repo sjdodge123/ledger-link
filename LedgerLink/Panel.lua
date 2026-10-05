@@ -26,7 +26,7 @@ local function clientRegionKnown()
 end
 
 local function create()
-    local f = ns.UI.Window("LedgerLinkPanel", 320, 290)
+    local f = ns.UI.Window("LedgerLinkPanel", 320, 330)
     title = ns.UI.Label(f, nil, "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -18)
 
@@ -76,19 +76,20 @@ local function create()
     local notesLabel = ns.UI.Label(f, "Include public guild notes (officer notes never)", "GameFontHighlightSmall")
     notesLabel:SetPoint("LEFT", notesBox, "RIGHT", 2, 0)
 
-    y = y - 34
+    y = y - 38
     pullsLabel = ns.UI.Label(f, nil, "GameFontHighlight")
     pullsLabel:SetPoint("TOPLEFT", 24, y - 4)
     local clear = ns.UI.Button(f, "Clear", 60, function() ns.ClearPulls() end, "LedgerLinkPanelClearPulls")
     clear:SetPoint("TOPRIGHT", -24, y)
 
+    y = y - 36
     local probe = ns.UI.Button(f, "Beta probe", 100, function()
         ns.lastCommand = "panel: probe"
         ns.Probe.Show()
     end, "LedgerLinkPanelProbe")
-    probe:SetPoint("BOTTOMLEFT", 24, 18)
+    probe:SetPoint("TOPLEFT", 24, y)
     local hint = ns.UI.Label(f, "/rl help for commands", "GameFontDisableSmall")
-    hint:SetPoint("BOTTOMRIGHT", -24, 24)
+    hint:SetPoint("TOPRIGHT", -24, y - 6)
 
     frame = f
 end

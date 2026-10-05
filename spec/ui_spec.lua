@@ -116,6 +116,33 @@ describe("panel", function()
         assert.equal(0, WowStub.focusCalls)
     end)
 
+    -- Beta feedback 2026-10-05: the export window opened on top of the panel,
+    -- and with the translucent dialog background the two were hard to tell
+    -- apart. The panel steps aside, and both windows are near-opaque.
+    it("closes when it opens an export or the probe, so only one window is up", function()
+        click("LedgerLinkPanelExportChar")
+        assert.is_false(ns.Panel.IsShown())
+        assert.is_true(WowStub.frames.LedgerLinkExportFrame.shown)
+        ns.Panel.Show()
+        click("LedgerLinkPanelProbe")
+        assert.is_false(ns.Panel.IsShown())
+    end)
+
+    it("stays open when an export can't run, so the player sees why", function()
+        WowStub.state.inCombat = true
+        click("LedgerLinkPanelExportChar")
+        assert.is_true(ns.Panel.IsShown())
+    end)
+
+    it("panel and export window have a near-opaque background", function()
+        click("LedgerLinkPanelExportChar")
+        for _, name in ipairs({ "LedgerLinkPanel", "LedgerLinkExportFrame" }) do
+            local color = WowStub.frames[name].backdropColor
+            assert(color, name .. " has no backdrop colour")
+            assert.truthy(color[4] >= 0.9, name .. " background alpha " .. tostring(color[4]))
+        end
+    end)
+
     it("closes with Escape", function()
         local found = false
         for _, name in ipairs(UISpecialFrames) do found = found or name == "LedgerLinkPanel" end

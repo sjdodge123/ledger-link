@@ -189,6 +189,7 @@ local function newWidget(kind, name)
         if key == "GetScript" then return function(_, ev) return self.scripts[ev] end end
         if key == "RegisterEvent" then return function(_, ev) self.events[ev] = true end end
         if key == "SetFocus" then return function() WowStub.focusCalls = WowStub.focusCalls + 1 end end
+        if key == "SetBackdropColor" then return function(_, r, g, b, a) self.backdropColor = { r, g, b, a } end end
         if key == "SetText" then return function(_, t) self.text = t end end
         if key == "GetText" then return function() return self.text end end
         if key == "Show" then return function() self.shown = true end end
