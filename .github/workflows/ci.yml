@@ -9,18 +9,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # LuaJIT = Lua 5.1 semantics, like the WoW client.
-      - uses: leafo/gh-actions-lua@v10
-        with:
-          luaVersion: "luajit-openresty"
-      - uses: leafo/gh-actions-luarocks@v4
+      # Tests run on LuaJIT = Lua 5.1 semantics, like the WoW client.
+      # luarocks itself runs on PUC Lua 5.1: under LuaJIT it can't load the
+      # luarocks.org manifest ("main function has more than 65536 constants").
+      # Rocks built for 5.1 load fine in LuaJIT (same ABI + search path).
+      - name: Install LuaJIT + luarocks
+        run: sudo apt-get update && sudo apt-get install -y luajit lua5.1 liblua5.1-0-dev luarocks
       - name: Install rocks
         run: |
-          luarocks install luacheck
-          luarocks install busted
-          luarocks install libdeflate
-          luarocks install dkjson
+          for rock in luacheck busted libdeflate dkjson; do sudo luarocks --lua-version=5.1 install "$rock"; done
       - name: luacheck
         run: luacheck .
-      - name: busted
-        run: busted --lua="$(command -v luajit || command -v lua)"
+      - name: busted (LuaJIT)
+        run: busted --lua=luajit
