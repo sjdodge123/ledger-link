@@ -114,6 +114,15 @@ describe("contract/v1", function()
         end
     end)
 
+    it("accepts every anonymised real string from the beta (spec/fixtures/beta)", function()
+        local names = fixtures("spec/fixtures/beta")
+        assert.is_true(#names > 0, "no fixtures in spec/fixtures/beta")
+        for _, name in ipairs(names) do
+            local result, code = importAndValidate(readFile(name .. ".txt"))
+            assert(result, name .. ": rejected with " .. tostring(code))
+        end
+    end)
+
     it("rejects every invalid fixture with the server's error code", function()
         local names = fixtures("contract/v1/fixtures/invalid")
         assert.is_true(#names > 0, "no fixtures in contract/v1/fixtures/invalid")

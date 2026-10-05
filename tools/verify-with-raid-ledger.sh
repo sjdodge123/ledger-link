@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Cross-check: decode addon-generated char / guild (incl. multi-page) / raid
-# strings with Raid Ledger's real server decoder (decodeImportString). A paged
+# strings, plus the anonymised real beta strings in spec/fixtures/beta, with
+# Raid Ledger's real server decoder (decodeImportString). A paged
 # guild paste must decode to the same roster + sha256 in reversed page order. Nothing is written into the Raid
 # Ledger checkout; the decode script lives in a temp dir.
 #
@@ -17,6 +18,8 @@ trap 'rm -rf "$TMP"' EXIT
 
 if command -v luarocks >/dev/null; then eval "$(luarocks --lua-version=5.1 path)"; fi
 (cd "$REPO" && luajit tools/gen_strings.lua "$TMP")
+# Anonymised real strings from the beta (tools/anonymise.lua) must decode too.
+for f in "$REPO"/spec/fixtures/beta/*.txt; do [ -e "$f" ] && cp "$f" "$TMP/beta-$(basename "$f")"; done
 
 cat > "$TMP/decode.ts" <<TS
 import { readFileSync, readdirSync } from 'node:fs';

@@ -182,9 +182,10 @@ _G.C_EncodingUtil = {
 
 -- Widget stubs: any method call is accepted and recorded.
 local function newWidget(kind, name)
-    local w = { kind = kind, name = name, scripts = {}, shown = false }
+    local w = { kind = kind, name = name, scripts = {}, shown = false, events = {} }
     return setmetatable(w, { __index = function(self, key)
         if key == "SetScript" then return function(_, ev, fn) self.scripts[ev] = fn end end
+        if key == "RegisterEvent" then return function(_, ev) self.events[ev] = true end end
         if key == "SetText" then return function(_, t) self.text = t end end
         if key == "GetText" then return function() return self.text end end
         if key == "Show" then return function() self.shown = true end end
