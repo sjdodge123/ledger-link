@@ -1,0 +1,16 @@
+## Interface: 16001
+## Title: Ledger Link
+## Notes: Export your character (and later guild + raid) as a string to paste into Raid Ledger.
+## Author: sjdodge123
+## Version: 0.1.0
+## SavedVariables: LedgerLinkDB
+## SavedVariablesPerCharacter: LedgerLinkCharDB
+
+Core.lua
+Json.lua
+Identity.lua
+Export.lua
+ExportFrame.lua
+Sections\Char.lua
+Sections\Guild.lua
+Sections\Raid.lua
