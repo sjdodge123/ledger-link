@@ -1,0 +1,13 @@
+package-as: LedgerLink
+
+# The addon lives in LedgerLink/; ship only that folder.
+move-folders:
+  LedgerLink/LedgerLink: LedgerLink
+
+ignore:
+  - spec
+  - tools
+  - .github
+  - .busted
+  - .luacheckrc
+  - README.md

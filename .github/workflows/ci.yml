@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # LuaJIT = Lua 5.1 semantics, like the WoW client.
+      - uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "luajit-openresty"
+      - uses: leafo/gh-actions-luarocks@v4
+      - name: Install rocks
+        run: |
+          luarocks install luacheck
+          luarocks install busted
+          luarocks install libdeflate
+          luarocks install dkjson
+      - name: luacheck
+        run: luacheck .
+      - name: busted
+        run: busted --lua="$(command -v luajit || command -v lua)"
