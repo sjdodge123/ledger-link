@@ -168,7 +168,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `GetNumSavedInstances` / `GetSavedInstanceInfo` (14th return `instanceId`) | lockouts in the import preview | lockout rows without an instance id are skipped |
 | `BackdropTemplate`, `UIPanelScrollFrameTemplate`, `UIPanelButtonTemplate`, `UIPanelCloseButton` | the export window looks right | falls back to a plain frame (no border) |
 | Very long strings in an `EditBox` | Ctrl+A / Ctrl+C on the biggest guild page | lower `Guild.MEMBERS_PER_PAGE` (250) |
-| `C_GuildInfo.GuildRoster()` (or legacy `GuildRoster()`) + `GUILD_ROSTER_UPDATE` | `C_GuildInfo.GuildRoster` exists, global `GuildRoster` is missing (probe, 2026-10-05); event still to check with `/rl export guild` right after login | "Loading the guild roster..." and no window: run it again |
+| Requesting the roster from an addon (`C_GuildInfo.GuildRoster()`) | **suspected blocked on the beta** (2026-10-05): `/rl export guild` raised "blocked from an action only available to the Blizzard UI" and any button on that popup crashed the client; probe and char export (same window, same roster reads) did not. The addon no longer requests the roster | the export waits for the roster the Guild window loads (`GUILD_ROSTER_UPDATE`) |
 | `GetNumGuildMembers()` counts offline members | returns two values, `32, 24` (total, online) with the Guild window open (probe, 2026-10-05); checklist step 5 | offline members missing unless the Guild window shows them |
 | `GetGuildRosterInfo(i)` return order (name 1, rank 2, rankIndex 3, level 4, note 7, online 9, class token 11, GUID 17) | **confirmed**, 17 returns (probe, 2026-10-05) | rows "unreadable and skipped"; the officer note (slot 8) is never read either way |
 | Roster names are `"First Surname-<realm>"` | **no realm suffix** on the beta: `"First Surname"` (probe, 2026-10-05) | exported raw; Raid Ledger strips the suffix |
@@ -178,7 +178,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `UnitGUID("raidN")` / `GetUnitName` readable during an encounter (secret values, E5) | roster count in the raid preview | roster re-read at `ENCOUNTER_END`; empty roster if both are secret |
 | `GetInstanceInfo()` 8th return = instance id | **confirmed** (Kalimdor = 1, 11 returns) (probe, 2026-10-05) | `instanceId` omitted |
 | `GetServerTime()` is unix seconds | **confirmed** (probe, 2026-10-05) | a millisecond value is divided down |
-| "LedgerLink has been blocked from an action only available to the Blizzard UI" (seen on the beta 2026-10-05; clicking Ignore crashed the client) | which function: the addon now records `ADDON_ACTION_FORBIDDEN` / `ADDON_ACTION_BLOCKED` with the preceding `/rl` command, prints it, and `/rl probe` lists it | fix the call it names |
+| "LedgerLink has been blocked from an action only available to the Blizzard UI" (beta 2026-10-05; **any** button on the popup crashed the client, so the record in SavedVariables was lost) | the addon records `ADDON_ACTION_FORBIDDEN` / `ADDON_ACTION_BLOCKED`, prints the function in chat at once, and `/rl probe` lists it if the session ends cleanly | see the roster-request row: the suspected call is removed |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
 
 ## Releases

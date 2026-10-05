@@ -20,7 +20,7 @@ read_globals = {
     "GetInventoryItemLink", "GetInventoryItemID", "C_Item", "C_ClassTalents", "C_Traits",
     "GetNumSavedInstances", "GetSavedInstanceInfo",
     -- guild section
-    "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "C_GuildInfo", "GuildRoster",
+    "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "C_GuildInfo",
     -- raid section
     "GetNumGroupMembers", "IsInRaid", "GetInstanceInfo",
     -- encoding
