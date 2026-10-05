@@ -11,6 +11,7 @@ _G.WowStub = WowStub
 local function defaultState()
     return {
         guid = "Player-4395-0ABCDEF0",
+        cursor = { 1000, 600 }, -- GetCursorPosition(); Minimap is centred at 1000,500
         unitName = { "Ana" },
         unitFullName = { "Ana", "Forever" },
         getUnitName = "Ana Forever",
@@ -180,18 +181,30 @@ _G.C_EncodingUtil = {
     DecodeBase64 = function(source) return base64.decode(source) end,
 }
 
--- Widget stubs: any method call is accepted and recorded.
+-- Widget stubs: any method call is accepted; the ones tests read are recorded.
 local function newWidget(kind, name)
-    local w = { kind = kind, name = name, scripts = {}, shown = false, events = {} }
+    local w = { kind = kind, name = name, scripts = {}, shown = false, events = {}, lines = {} }
     return setmetatable(w, { __index = function(self, key)
         if key == "SetScript" then return function(_, ev, fn) self.scripts[ev] = fn end end
+        if key == "GetScript" then return function(_, ev) return self.scripts[ev] end end
         if key == "RegisterEvent" then return function(_, ev) self.events[ev] = true end end
         if key == "SetFocus" then return function() WowStub.focusCalls = WowStub.focusCalls + 1 end end
         if key == "SetText" then return function(_, t) self.text = t end end
         if key == "GetText" then return function() return self.text end end
         if key == "Show" then return function() self.shown = true end end
         if key == "Hide" then return function() self.shown = false end end
-        if key == "CreateFontString" then return function() return newWidget("FontString") end end
+        if key == "IsShown" then return function() return self.shown end end
+        if key == "SetChecked" then return function(_, v) self.checked = not not v end end
+        if key == "GetChecked" then return function() return self.checked end end
+        if key == "LockHighlight" then return function() self.highlighted = true end end
+        if key == "UnlockHighlight" then return function() self.highlighted = false end end
+        if key == "SetPoint" then return function(_, ...) self.point = { ... } end end
+        if key == "SetTexture" then return function(_, t) self.texture = t end end
+        if key == "SetOwner" then return function() self.lines = {} end end
+        if key == "AddLine" then return function(_, t) self.lines[#self.lines + 1] = t end end
+        if key == "CreateFontString" or key == "CreateTexture" then
+            return function() return newWidget(key == "CreateTexture" and "Texture" or "FontString") end
+        end
         return function() end
     end })
 end
@@ -203,6 +216,12 @@ _G.CreateFrame = function(kind, name)
     return w
 end
 _G.UIParent = newWidget("Frame", "UIParent")
+_G.UIParent.GetEffectiveScale = function() return 1 end
+_G.Minimap = newWidget("Frame", "Minimap")
+_G.Minimap.GetCenter = function() return 1000, 500 end
+_G.Minimap.GetWidth = function() return 140 end
+_G.GameTooltip = newWidget("GameTooltip", "GameTooltip")
+_G.GetCursorPosition = function() return unpack(s().cursor, 1, 2) end
 _G.UISpecialFrames = {}
 _G.ChatFontNormal = {}
 _G.SlashCmdList = {}

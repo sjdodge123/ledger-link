@@ -29,6 +29,7 @@ read_globals = {
     "GetCurrentRegionName", "GetCVar", "GetNormalizedRealmName", "C_GameRules", "C_Seasons",
     -- UI
     "CreateFrame", "UIParent", "UISpecialFrames", "ChatFontNormal",
+    "Minimap", "GameTooltip", "GetCursorPosition",
 }
 
 files["spec/**"] = {
