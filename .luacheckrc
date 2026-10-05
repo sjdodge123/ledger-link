@@ -1,6 +1,6 @@
 std = "lua51"
 max_line_length = 140
-exclude_files = { ".luarocks/**", ".install/**", "lua_modules/**" }
+exclude_files = { ".luarocks/**", ".install/**", "lua_modules/**", "node_modules/**" }
 
 -- Globals the addon defines (SavedVariables + slash command registration).
 globals = {

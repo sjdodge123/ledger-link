@@ -3,3 +3,4 @@ lua_modules/
 *.zip
 .DS_Store
 HANDOVER-*.md
+node_modules/

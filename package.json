@@ -1,0 +1,9 @@
+{
+  "name": "ledgerlink-dev",
+  "private": true,
+  "description": "Dev-only tooling: validates export payloads against contract/v1/schema.json. Not shipped.",
+  "license": "MIT",
+  "devDependencies": {
+    "ajv": "^8.17.1"
+  }
+}
