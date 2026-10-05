@@ -1,13 +1,17 @@
 package-as: LedgerLink
 
-# The addon lives in LedgerLink/; ship only that folder.
+# The addon lives in LedgerLink/; ship only that folder (plus LICENSE, which the
+# packager copies in). tools/check-package-layout.sh enforces this in CI.
 move-folders:
   LedgerLink/LedgerLink: LedgerLink
 
 ignore:
   - spec
   - tools
-  - .github
-  - .busted
-  - .luacheckrc
+  - contract
+  - node_modules
+  - package.json
+  - package-lock.json
+  - AGENTS.md
+  - CLAUDE.md
   - README.md

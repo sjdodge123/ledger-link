@@ -29,3 +29,15 @@ jobs:
       - name: busted (LuaJIT)
         run: busted --lua=luajit
 
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Dry run: build the zip exactly as release.yml would, but upload nothing.
+      - uses: BigWigsMods/packager@v2
+        with:
+          args: -d
+      - name: Check zip layout
+        run: tools/check-package-layout.sh .release/LedgerLink-*.zip

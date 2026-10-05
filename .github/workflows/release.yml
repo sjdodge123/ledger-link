@@ -1,0 +1,27 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      # Full history so the packager can build the changelog and version from tags.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Builds LedgerLink-<tag>.zip and attaches it to a GitHub Release. Tags
+      # containing alpha/beta become pre-releases. CurseForge/Wago uploads are
+      # skipped until their secrets and the ## X-Curse-Project-ID / ## X-Wago-ID
+      # .toc lines exist.
+      - uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
