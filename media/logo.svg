@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#3730a3"/>
+    </linearGradient>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#cbd5e1"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="0.5" stop-color="#fbbf24"/>
+      <stop offset="1" stop-color="#d97706"/>
+    </linearGradient>
+    <!-- Cuts a gap in the right ring where the left ring passes over it (top crossing) -->
+    <clipPath id="topCrossing"><rect x="226" y="330" width="60" height="72"/></clipPath>
+    <mask id="ringGap" maskUnits="userSpaceOnUse" x="0" y="0" width="512" height="512">
+      <rect width="512" height="512" fill="#fff"/>
+      <rect x="116" y="362" width="160" height="80" rx="40" fill="none" stroke="#000" stroke-width="36" clip-path="url(#topCrossing)"/>
+    </mask>
+  </defs>
+
+  <!-- Background tile -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <rect x="18" y="18" width="476" height="476" rx="80" fill="none" stroke="#a5b4fc" stroke-width="4" opacity="0.45"/>
+
+  <!-- Ledger: cover -->
+  <path d="M74 132 L74 360 C140 346 206 350 256 376 C306 350 372 346 438 360 L438 132 C372 120 306 124 256 146 C206 124 140 120 74 132 Z"
+        fill="#1e1b4b"/>
+  <!-- Pages -->
+  <path d="M256 150 C208 128 150 124 92 134 L92 342 C150 332 208 336 256 360 Z" fill="url(#page)"/>
+  <path d="M256 150 C304 128 362 124 420 134 L420 342 C362 332 304 336 256 360 Z" fill="url(#page)"/>
+  <path d="M256 150 L256 360" stroke="#312e81" stroke-width="6"/>
+  <!-- Ledger rules + column lines -->
+  <g stroke="#6366f1" stroke-width="5" stroke-linecap="round" opacity="0.55">
+    <path d="M114 176 L234 182"/><path d="M114 206 L234 212"/><path d="M114 236 L234 242"/>
+    <path d="M114 266 L234 272"/><path d="M114 296 L234 302"/>
+    <path d="M278 182 L398 176"/><path d="M278 212 L398 206"/><path d="M278 242 L398 236"/>
+    <path d="M278 272 L398 266"/><path d="M278 302 L398 296"/>
+  </g>
+  <g stroke="#4338ca" stroke-width="4" opacity="0.5">
+    <path d="M196 160 L196 326"/><path d="M316 160 L316 326"/>
+  </g>
+
+  <!-- Chain link: two interlocking gold rings -->
+  <g transform="translate(6 -8) rotate(-18 256 400)" fill="none">
+    <rect x="116" y="362" width="160" height="80" rx="40" stroke="#78350f" stroke-width="34"/>
+    <rect x="116" y="362" width="160" height="80" rx="40" stroke="url(#gold)" stroke-width="22"/>
+    <g mask="url(#ringGap)">
+      <rect x="236" y="362" width="160" height="80" rx="40" stroke="#78350f" stroke-width="34"/>
+      <rect x="236" y="362" width="160" height="80" rx="40" stroke="url(#gold)" stroke-width="22"/>
+    </g>
+  </g>
+</svg>

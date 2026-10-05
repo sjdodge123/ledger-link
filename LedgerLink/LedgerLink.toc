@@ -1,8 +1,9 @@
 ## Interface: 16001
 ## Title: Ledger Link
-## Notes: Export your character (and later guild + raid) as a string to paste into Raid Ledger.
+## Notes: Export your character, guild roster and raid pulls as a string to paste into Raid Ledger.
 ## Author: sjdodge123
-## Version: 0.1.0
+## Version: @project-version@
+## X-Curse-Project-ID: 1728299
 ## SavedVariables: LedgerLinkDB
 ## SavedVariablesPerCharacter: LedgerLinkCharDB
 
