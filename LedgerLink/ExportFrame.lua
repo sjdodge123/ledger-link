@@ -1,5 +1,10 @@
 -- Copyable export window (WeakAuras/Details pattern): a movable frame with
--- a read-only-feeling multi-line EditBox, pre-selected text and Escape to close.
+-- a read-only-feeling multi-line EditBox and Escape to close. The addon never
+-- moves keyboard focus itself (no SetFocus): on the beta, doing that while the
+-- game was handling the /rl chat command made the gamepad UI call
+-- SetPreferredGamepadInteractTarget() inside the addon's call chain, which the
+-- game blocks ("blocked from an action only available to the Blizzard UI") and
+-- then crashed. The player clicks the text instead; that selects all of it.
 local _, ns = ...
 
 local ExportFrame = {}
@@ -11,11 +16,6 @@ local pages, pageIndex, currentSection, footer = {}, 1, "", nil
 
 --- Shown above a multi-page export.
 ExportFrame.PAGE_HINT = "Copy every page (Next >). Raid Ledger accepts all pages pasted into one box, in any order."
-
-local function selectAll()
-    editBox:SetFocus()
-    editBox:HighlightText()
-end
 
 local function createBackdrop(f)
     if f.SetBackdrop then
@@ -46,6 +46,8 @@ local function createEditBox(parent)
         end
     end)
     box:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
+    -- A click also moves the cursor, which would drop the selection.
+    box:SetScript("OnMouseUp", function(self) self:HighlightText() end)
     scroll:SetScrollChild(box)
     return box
 end
@@ -59,13 +61,12 @@ local function button(parent, text, width, onClick)
 end
 
 local function createButtons(parent)
-    button(parent, "Select all", 100, selectAll):SetPoint("BOTTOMLEFT", 20, 16)
     prevButton = button(parent, "< Prev", 70, function() ExportFrame.PrevPage() end)
-    prevButton:SetPoint("BOTTOMLEFT", 130, 16)
+    prevButton:SetPoint("BOTTOMLEFT", 20, 16)
     nextButton = button(parent, "Next >", 70, function() ExportFrame.NextPage() end)
-    nextButton:SetPoint("BOTTOMLEFT", 280, 16)
+    nextButton:SetPoint("BOTTOMLEFT", 170, 16)
     pageLabel = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    pageLabel:SetPoint("BOTTOMLEFT", 205, 21)
+    pageLabel:SetPoint("BOTTOMLEFT", 95, 21)
     local close = CreateFrame("Button", nil, parent, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -6, -6)
 end
@@ -116,10 +117,10 @@ local function render()
     if nextButton.SetEnabled then nextButton:SetEnabled(pageIndex < count) end
     sizeLabel:SetText(string.format("%.1f KB - %s", #currentText / 1024, ExportFrame.GetFooter()))
     editBox:SetText(currentText)
-    selectAll()
+    editBox:HighlightText()
 end
 
-ExportFrame.DEFAULT_FOOTER = "Ctrl+C, then paste into Raid Ledger -> Import string"
+ExportFrame.DEFAULT_FOOTER = "Click the text, Ctrl+C, then paste into Raid Ledger -> Import string"
 
 --- Show one string, or a list of page strings, for `section`; the (first)
 --- page is pre-selected for Ctrl+C. `footerText` replaces the default hint.

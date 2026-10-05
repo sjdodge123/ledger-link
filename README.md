@@ -48,8 +48,8 @@ Details!/DBM-style log parsing is impossible in-game.
    the AddOns list on the character screen.
 3. `/rl ruleset normal` (or `pvp`, `rp`, `hardcore`) once per character. On the beta
    also `/rl region us` (or `eu`, `kr`, `tw`, `cn`) once: the beta client reports a test region.
-4. `/rl export char`, then Ctrl+C (the text is pre-selected; **Select all**
-   re-selects it).
+4. `/rl export char`, then **click the text** (that selects all of it) and
+   Ctrl+C.
 5. In Raid Ledger: your character -> **Import string** -> paste.
 
 ## Beta test checklist (operator)
@@ -168,7 +168,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `GetNumSavedInstances` / `GetSavedInstanceInfo` (14th return `instanceId`) | lockouts in the import preview | lockout rows without an instance id are skipped |
 | `BackdropTemplate`, `UIPanelScrollFrameTemplate`, `UIPanelButtonTemplate`, `UIPanelCloseButton` | the export window looks right | falls back to a plain frame (no border) |
 | Very long strings in an `EditBox` | Ctrl+A / Ctrl+C on the biggest guild page | lower `Guild.MEMBERS_PER_PAGE` (250) |
-| Requesting the roster from an addon (`C_GuildInfo.GuildRoster()`) | **suspected blocked on the beta** (2026-10-05): `/rl export guild` raised "blocked from an action only available to the Blizzard UI" and any button on that popup crashed the client; probe and char export (same window, same roster reads) did not. The addon no longer requests the roster | the export waits for the roster the Guild window loads (`GUILD_ROSTER_UPDATE`) |
+| Requesting the roster from an addon (`C_GuildInfo.GuildRoster()`) | **not the cause** of the beta popup (alpha5 still showed it); the addon no longer requests the roster anyway: the client has it after login | the export waits for the roster the Guild window loads (`GUILD_ROSTER_UPDATE`) |
 | `GetNumGuildMembers()` counts offline members | returns two values, `32, 24` (total, online) with the Guild window open (probe, 2026-10-05); checklist step 5 | offline members missing unless the Guild window shows them |
 | `GetGuildRosterInfo(i)` return order (name 1, rank 2, rankIndex 3, level 4, note 7, online 9, class token 11, GUID 17) | **confirmed**, 17 returns (probe, 2026-10-05) | rows "unreadable and skipped"; the officer note (slot 8) is never read either way |
 | Roster names are `"First Surname-<realm>"` | **no realm suffix** on the beta: `"First Surname"` (probe, 2026-10-05) | exported raw; Raid Ledger strips the suffix |
@@ -178,7 +178,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `UnitGUID("raidN")` / `GetUnitName` readable during an encounter (secret values, E5) | roster count in the raid preview | roster re-read at `ENCOUNTER_END`; empty roster if both are secret |
 | `GetInstanceInfo()` 8th return = instance id | **confirmed** (Kalimdor = 1, 11 returns) (probe, 2026-10-05) | `instanceId` omitted |
 | `GetServerTime()` is unix seconds | **confirmed** (probe, 2026-10-05) | a millisecond value is divided down |
-| "LedgerLink has been blocked from an action only available to the Blizzard UI" (beta 2026-10-05; **any** button on the popup crashed the client, so the record in SavedVariables was lost) | the addon records `ADDON_ACTION_FORBIDDEN` / `ADDON_ACTION_BLOCKED`, prints the function in chat at once, and `/rl probe` lists it if the session ends cleanly | see the roster-request row: the suspected call is removed |
+| "LedgerLink has been blocked from an action only available to the Blizzard UI" | **found** (beta 2026-10-05, playing with a gamepad): the blocked function was `SetPreferredGamepadInteractTarget()`. The export window called `editBox:SetFocus()` while the game was still handling the `/rl` command, and the gamepad UI reacted inside that addon-started call chain; any click afterwards crashed the client. The addon no longer moves focus: the player clicks the text. Still recorded via `ADDON_ACTION_FORBIDDEN` / `ADDON_ACTION_BLOCKED` (chat line + `/rl probe`) | confirm with a gamepad on alpha6 |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
 
 ## Releases

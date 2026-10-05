@@ -123,7 +123,7 @@ function Probe.Report()
     return table.concat(lines, "\n")
 end
 
-Probe.FOOTER = "Ctrl+C, then paste this report to the addon developer (not into Raid Ledger)"
+Probe.FOOTER = "Click the text, Ctrl+C, then paste this report to the addon developer (not into Raid Ledger)"
 
 function Probe.Show()
     ns.ExportFrame.Show("beta probe", Probe.Report(), Probe.FOOTER)
