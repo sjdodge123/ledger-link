@@ -158,11 +158,10 @@ describe("slash commands", function()
         assert.equals(#text, LedgerLinkDB.lastExport.char.bytes)
     end)
 
-    it("guild and raid print not yet supported", function()
-        for _, section in ipairs({ "guild", "raid" }) do
-            SlashCmdList.LEDGERLINK("export " .. section)
-            assert.truthy(WowStub.printed[#WowStub.printed]:find("not yet supported"))
-        end
+    it("raid with no recorded pulls explains why instead of exporting", function()
+        SlashCmdList.LEDGERLINK("export raid")
+        assert.truthy(WowStub.printed[#WowStub.printed]:find("No boss pulls recorded yet"))
+        assert.is_nil(LedgerLinkDB.lastExport.raid)
     end)
 
     it("refuses to export in combat", function()

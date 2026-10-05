@@ -42,7 +42,51 @@ local function defaultState()
             { "Expired", 2, 0, 9, false, false, 0, true, 40, "40 Player", 10, 10, false, 249 },
         },
         base64Variant = "standard",
+        -- guild: GetGuildRosterInfo tuples (17 returns, slot 8 = officer note)
+        guildRealm = nil,
+        guildRoster = {
+            WowStub.member(0, { guid = "Player-4395-0ABCDEF0", name = "Ana Forever-Forever", online = true }),
+            WowStub.member(1),
+            WowStub.member(2, { rankIndex = 0, rank = "Guild Master" }),
+        },
+        lastOnline = {},
+        rosterRequests = 0,
+        -- raid / group
+        inRaid = false,
+        numGroupMembers = 0,
+        units = {},
+        instance = { "Molten Core", "raid", 9, "40 Player", 40, 0, false, 409 },
     }
+end
+
+--- One GetGuildRosterInfo tuple. Slot 8 always holds an officer note so
+--- tests prove it never leaves the addon.
+function WowStub.member(i, o)
+    o = o or {}
+    local hex = string.format("%08X", 0x10000 + i)
+    local online = o.online or false
+    return {
+        o.name or ("Member" .. i .. " Surname-Forever"), o.rank or "Raider", o.rankIndex or 3, o.level or 60,
+        "Mage", "Orgrimmar", o.note or ("public note " .. i), o.officerNote or ("OFFICER SECRET " .. i),
+        online, 0, o.class or "MAGE", 0, 0, false, false, 0, o.guid or ("Player-4395-" .. hex),
+    }
+end
+
+--- `n` roster rows with distinct GUIDs (the exporter is row 1).
+function WowStub.roster(n)
+    local rows = { WowStub.member(0, { guid = "Player-4395-0ABCDEF0", name = "Ana Forever-Forever", online = true }) }
+    for i = 1, n - 1 do rows[#rows + 1] = WowStub.member(i) end
+    return rows
+end
+
+--- Put `n` members in the player's raid (raid1 = the player).
+function WowStub.raid(n)
+    local st = WowStub.state
+    st.inRaid, st.numGroupMembers, st.units = true, n, {}
+    for i = 1, n do
+        local guid = i == 1 and st.guid or string.format("Player-4395-%08X", 0x20000 + i)
+        st.units["raid" .. i] = { guid = guid, name = i == 1 and st.getUnitName or ("Raider" .. i .. " Doe") }
+    end
 end
 
 local printed = {}
@@ -65,10 +109,18 @@ _G.print = function(...)
     for i = 1, select("#", ...) do t[i] = tostring(select(i, ...)) end
     printed[#printed + 1] = table.concat(t, " ")
 end
-_G.UnitGUID = function() return s().guid end
+local function unit(u)
+    if u == nil or u == "player" then return { guid = s().guid, name = s().getUnitName } end
+    return s().units[u]
+end
+_G.UnitGUID = function(u)
+    local x = unit(u)
+    if x and x.secret then error("attempt to use a secret value") end
+    return x and x.guid
+end
 _G.UnitName = function() return unpack(s().unitName, 1, 2) end
 _G.UnitFullName = function() return unpack(s().unitFullName, 1, 2) end
-_G.GetUnitName = function() return s().getUnitName end
+_G.GetUnitName = function(u) local x = unit(u) return x and x.name end
 _G.GetRealmName = function() return s().realmName end
 _G.GetCurrentRegion = function() return s().region end
 _G.GetBuildInfo = function() return unpack(s().build, 1, 4) end
@@ -77,7 +129,14 @@ _G.UnitClass = function() return unpack(s().class, 1, 3) end
 _G.UnitRace = function() return unpack(s().race, 1, 3) end
 _G.UnitLevel = function() return s().level end
 _G.UnitFactionGroup = function() return s().faction end
-_G.GetGuildInfo = function() return s().guild end
+_G.GetGuildInfo = function() return s().guild, "Raider", 3, s().guildRealm end
+_G.GetNumGuildMembers = function() return #s().guildRoster, 0, 0 end
+_G.GetGuildRosterInfo = function(i) local r = s().guildRoster[i] if r then return unpack(r, 1, 17) end end
+_G.GetGuildRosterLastOnline = function(i) return unpack(s().lastOnline[i] or { 0, 0, 2, 5 }, 1, 4) end
+_G.C_GuildInfo = { GuildRoster = function() s().rosterRequests = s().rosterRequests + 1 end }
+_G.GetNumGroupMembers = function() return s().numGroupMembers end
+_G.IsInRaid = function() return s().inRaid end
+_G.GetInstanceInfo = function() return unpack(s().instance, 1, 8) end
 _G.GetServerTime = function() return s().serverTime end
 _G.InCombatLockdown = function() return s().inCombat end
 _G.GetInventoryItemLink = function(_, slot) local g = s().gear[slot] return g and g.link end

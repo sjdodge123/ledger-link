@@ -19,6 +19,10 @@ read_globals = {
     -- char section
     "GetInventoryItemLink", "GetInventoryItemID", "C_Item", "C_ClassTalents", "C_Traits",
     "GetNumSavedInstances", "GetSavedInstanceInfo",
+    -- guild section
+    "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "C_GuildInfo", "GuildRoster",
+    -- raid section
+    "GetNumGroupMembers", "IsInRaid", "GetInstanceInfo",
     -- encoding
     "C_EncodingUtil", "Enum",
     -- UI

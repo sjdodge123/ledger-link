@@ -70,7 +70,8 @@ local function fullName(r)
     return first or ""
 end
 
-local function normalizeGuid(guid)
+--- `Player-<1-5 digits>-<8 hex>` with upper-case hex, or nil (contract AddonGuidSchema).
+function ns.NormalizeGuid(guid)
     if type(guid) ~= "string" then return nil end
     local prefix, digits, hex = string.match(guid, "^(Player%-)(%d+)%-(%x+)$")
     if not prefix or #digits > 5 or #hex ~= 8 then return nil end
@@ -86,7 +87,7 @@ end
 
 function Identity.Who()
     local rawGuid = ns.SafeCall(UnitGUID, "player")
-    local guid = normalizeGuid(rawGuid)
+    local guid = ns.NormalizeGuid(rawGuid)
     if not guid then
         return nil, "Unexpected player GUID format: " .. tostring(rawGuid) .. ". Please report this."
     end

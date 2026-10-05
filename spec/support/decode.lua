@@ -5,10 +5,16 @@ local base64 = require("spec.support.base64")
 local dkjson = require("dkjson")
 
 return function(str)
-    local version, section, body = str:match("^!RL(%d+)!(%a+)!([A-Za-z0-9+/]+=?=?)$")
+    local version, section, page, of, body = str:match("^!RL(%d+)!(%a+)%-(%d+)of(%d+)!([A-Za-z0-9+/]+=?=?)$")
+    if not version then
+        version, section, body = str:match("^!RL(%d+)!(%a+)!([A-Za-z0-9+/]+=?=?)$")
+    end
     assert(version, "bad header: " .. str:sub(1, 20))
     assert(#body % 4 == 0, "base64 body is not padded")
     local json = assert(LibDeflate:DecompressZlib(base64.decode(body)), "zlib inflate failed")
     local payload = assert(dkjson.decode(json, 1, dkjson.null))
-    return { version = tonumber(version), section = section, body = body, json = json, payload = payload }
+    return {
+        version = tonumber(version), section = section, page = tonumber(page), of = tonumber(of),
+        body = body, json = json, payload = payload,
+    }
 end
