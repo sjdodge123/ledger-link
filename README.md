@@ -160,24 +160,24 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `C_EncodingUtil.EncodeBase64` alphabet + padding | string pastes cleanly | URL-safe / unpadded output is normalised to standard padded either way |
 | `GetCurrentRegion()` returns 1-5 | **no on the beta**: it returns `90`; `GetCurrentRegionName()` is `""` and the `portal` CVar is `"test"` (2026-10-05) | outside 1-5 the player's `/rl region` choice is sent; without one the export asks for it. Live clients are expected to return 1-5 |
 | `UnitGUID("player")` is `Player-<n>-<8 hex>` | **confirmed** on the beta (2026-10-05) | export refuses with "Unexpected player GUID format" |
-| `GetUnitName("player", true)` returns "First Surname" | `/dump GetUnitName("player", true)` | `fullName` falls back to `UnitFullName` |
-| `GetRealmName()` on a realmless client | `/dump GetRealmName()` | stored raw only; the server ignores it |
-| No ruleset API exists | - | set it with `/rl ruleset`; otherwise `null` |
+| `GetUnitName("player", true)` returns "First Surname" | **confirmed** (probe, 2026-10-05); `UnitName`/`UnitFullName` return (first, surname), not a realm | `fullName` falls back to `UnitFullName` |
+| `GetRealmName()` on a realmless client | beta returns `"Classic Beta PvP"` (probe, 2026-10-05) | stored raw only; the server ignores it |
+| No ruleset API exists | `C_GameRules` exists on the beta (probe, 2026-10-05): `IsHardcoreActive()` (false), `IsStandard()` (true), `GetForeverExperiencePreset()` and `GetActiveGameMode()` (both `1` on a PvP realm). Not yet known whether any of them reflects normal/pvp/rp; needs a probe from a second realm type | set it with `/rl ruleset`; otherwise `null` |
 | `GetInventoryItemID` / `GetInventoryItemLink` / `C_Item.GetDetailedItemLevelInfo` | gear count + item levels in the import preview | slot skipped / `ilvl` omitted |
 | `C_ClassTalents.GetActiveConfigID`, `C_Traits.GetConfigInfo/GetTreeNodes/GetNodeInfo/GenerateImportString` | talent node count in the import preview | `talents.nodes` empty |
 | `GetNumSavedInstances` / `GetSavedInstanceInfo` (14th return `instanceId`) | lockouts in the import preview | lockout rows without an instance id are skipped |
 | `BackdropTemplate`, `UIPanelScrollFrameTemplate`, `UIPanelButtonTemplate`, `UIPanelCloseButton` | the export window looks right | falls back to a plain frame (no border) |
 | Very long strings in an `EditBox` | Ctrl+A / Ctrl+C on the biggest guild page | lower `Guild.MEMBERS_PER_PAGE` (250) |
-| `C_GuildInfo.GuildRoster()` (or legacy `GuildRoster()`) + `GUILD_ROSTER_UPDATE` | `/rl export guild` right after login | "Loading the guild roster..." and no window: run it again |
-| `GetNumGuildMembers()` counts offline members | checklist step 5 | offline members missing unless the Guild window shows them |
-| `GetGuildRosterInfo(i)` return order (name 1, rank 2, rankIndex 3, level 4, note 7, online 9, class token 11, GUID 17) | `/dump GetGuildRosterInfo(1)` | rows "unreadable and skipped"; the officer note (slot 8) is never read either way |
-| Roster names are `"First Surname-<realm>"` | same dump | exported raw; Raid Ledger strips the suffix |
-| `GetGuildRosterLastOnline(i)` (years, months, days) | offline members' "last online" in the preview | `lastOnlineDays` omitted |
-| `GetGuildInfo("player")` 4th return (realm) | guild preview | `rawRealm` falls back to `GetRealmName()` |
+| `C_GuildInfo.GuildRoster()` (or legacy `GuildRoster()`) + `GUILD_ROSTER_UPDATE` | `C_GuildInfo.GuildRoster` exists, global `GuildRoster` is missing (probe, 2026-10-05); event still to check with `/rl export guild` right after login | "Loading the guild roster..." and no window: run it again |
+| `GetNumGuildMembers()` counts offline members | returns two values, `32, 24` (total, online) with the Guild window open (probe, 2026-10-05); checklist step 5 | offline members missing unless the Guild window shows them |
+| `GetGuildRosterInfo(i)` return order (name 1, rank 2, rankIndex 3, level 4, note 7, online 9, class token 11, GUID 17) | **confirmed**, 17 returns (probe, 2026-10-05) | rows "unreadable and skipped"; the officer note (slot 8) is never read either way |
+| Roster names are `"First Surname-<realm>"` | **no realm suffix** on the beta: `"First Surname"` (probe, 2026-10-05) | exported raw; Raid Ledger strips the suffix |
+| `GetGuildRosterLastOnline(i)` (years, months, days) | returns nothing for an online member, as expected (probe, 2026-10-05); offline members still to check in the preview | `lastOnlineDays` omitted |
+| `GetGuildInfo("player")` 4th return (realm) | **confirmed**: `"ClassicBetaPvP2"`, which differs from `GetRealmName()` (probe, 2026-10-05) | `rawRealm` falls back to `GetRealmName()` |
 | `ENCOUNTER_START` / `ENCOUNTER_END` fire with IDs on Forever (E5) | `/rl raid` after a boss | no pulls recorded |
 | `UnitGUID("raidN")` / `GetUnitName` readable during an encounter (secret values, E5) | roster count in the raid preview | roster re-read at `ENCOUNTER_END`; empty roster if both are secret |
-| `GetInstanceInfo()` 8th return = instance id | raid preview | `instanceId` omitted |
-| `GetServerTime()` is unix seconds | pull times in the preview | a millisecond value is divided down |
+| `GetInstanceInfo()` 8th return = instance id | **confirmed** (Kalimdor = 1, 11 returns) (probe, 2026-10-05) | `instanceId` omitted |
+| `GetServerTime()` is unix seconds | **confirmed** (probe, 2026-10-05) | a millisecond value is divided down |
 | "LedgerLink has been blocked from an action only available to the Blizzard UI" (seen on the beta 2026-10-05; clicking Ignore crashed the client) | which function: the addon now records `ADDON_ACTION_FORBIDDEN` / `ADDON_ACTION_BLOCKED` with the preceding `/rl` command, prints it, and `/rl probe` lists it | fix the call it names |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
 
