@@ -100,8 +100,11 @@ server sorts pages by number and refuses a set from different exports, a
 missing page or a member listed twice. The whole paste must stay under the
 server's 256 KB limit; the addon refuses anything bigger.
 
-The JSON is the Raid Ledger contract `AddonExportSchema`
-(`packages/contract/src/wow-addon-export.schema.ts`). Every object is strict:
+The JSON is the Raid Ledger contract `ledgerlink/v1`, which **Raid Ledger owns**
+(`packages/contract/ledgerlink/v1/` there, generated from `AddonExportSchema`).
+This repo pins a copy in `contract/v1/` (`SOURCE` = the Raid Ledger commit);
+refresh it with `tools/sync-contract.sh <raid-ledger-checkout> [ref]`, never by
+hand, and never change the format here (see `AGENTS.md`). Every object is strict:
 an unknown key rejects the whole string, so the addon never emits extra fields.
 JSON is produced by the addon's own encoder (`Json.lua`) so empty lists encode
 as `[]` and an unknown ruleset as `null`; `C_EncodingUtil` does the zlib
@@ -117,6 +120,7 @@ luarocks --lua-version=5.1 --lua-dir="$(brew --prefix luajit)" --local install b
 luarocks --lua-version=5.1 --lua-dir="$(brew --prefix luajit)" --local install luacheck
 luarocks --lua-version=5.1 --lua-dir="$(brew --prefix luajit)" --local install libdeflate
 luarocks --lua-version=5.1 --lua-dir="$(brew --prefix luajit)" --local install dkjson
+npm ci   # ajv, for the contract schema check
 eval "$(luarocks --lua-version=5.1 path)"
 luacheck .
 busted --lua=luajit
@@ -124,7 +128,10 @@ busted --lua=luajit
 
 `spec/support/wow_stub.lua` stubs every WoW API the addon calls;
 `C_EncodingUtil` is backed by LibDeflate + pure-Lua base64, so test strings are
-real strings. `tools/verify-with-raid-ledger.sh` decodes the strings
+real strings. `spec/contract_spec.lua` validates every page of every export
+case (`spec/support/export_cases.lua`) against `contract/v1/schema.json`, and
+decodes `contract/v1/fixtures/` once Raid Ledger publishes them; that is the CI
+gate. As an optional local cross-check, `tools/verify-with-raid-ledger.sh` decodes the strings
 `tools/gen_strings.lua` generates (char, guild single + 3-page + 8-page +
 over-cap, raid) with Raid Ledger's actual server decoder
 (`RAID_LEDGER_DIR=<checkout>`), and checks that a paged guild paste decodes
@@ -161,3 +168,13 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `GetInstanceInfo()` 8th return = instance id | raid preview | `instanceId` omitted |
 | `GetServerTime()` is unix seconds | pull times in the preview | a millisecond value is divided down |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
+
+## Releases
+
+Pushing a `v*` tag runs `.github/workflows/release.yml` (BigWigsMods packager):
+it builds `LedgerLink-<tag>.zip` and attaches it to a GitHub Release; tags
+containing `alpha`/`beta` are pre-releases. CI also builds the zip on every push
+without uploading and runs `tools/check-package-layout.sh`, which fails unless
+the zip holds only `LedgerLink/LedgerLink.toc`, the files it loads, and LICENSE.
+CurseForge/Wago uploads stay off until the `CF_API_KEY` / `WAGO_API_TOKEN`
+secrets and the `## X-Curse-Project-ID` / `## X-Wago-ID` .toc lines exist.
