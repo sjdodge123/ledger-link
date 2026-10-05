@@ -16,6 +16,7 @@ data, compresses it, and shows it in a box you copy from.
 /rl ruleset normal|pvp|rp|hardcore           tell the export your ruleset
 /rl region us|eu|kr|tw|cn   your region; only used when the game doesn't report one (beta)
 /rl status           last export times + recorded pull count
+/rl probe            all beta checks in one copyable report (for bug reports)
 ```
 
 **Guild export.** Officer notes are never read or exported, whatever your rank
@@ -56,12 +57,13 @@ Details!/DBM-style log parsing is impossible in-game.
 Run these in game on the beta and paste the results back (into the Linear
 story or a GitHub issue). `/console scriptErrors 1` first so Lua errors show.
 
-1. `/dump GetBuildInfo()` and `/dump GetCurrentRegion()` - paste both.
+1. `/rl probe`, Ctrl+C, paste the whole report back. It runs every check from
+   "Beta unknowns" below (read-only; the officer note is never included), so no
+   `/dump` lines need typing.
 2. **Char:** `/rl ruleset normal`, `/rl export char`, copy, paste into Raid
    Ledger's import preview. Paste back: the preview (or error text).
-3. **Guild roster APIs:** `/dump GetNumGuildMembers()` and
-   `/dump GetGuildRosterInfo(1)` (all returns; blank out the officer note
-   before pasting) and `/dump C_GuildInfo and C_GuildInfo.GuildRoster`.
+3. **Guild roster APIs:** open the Guild window, then `/rl probe` again (the
+   roster lines fill in once the roster has loaded).
 4. **Guild export:** open the Guild window once, then `/rl export guild`.
    Paste back: the chat lines it printed (skipped / duplicate / left-out
    counts, page count), whether **Page x/y** + Prev/Next work, and how long

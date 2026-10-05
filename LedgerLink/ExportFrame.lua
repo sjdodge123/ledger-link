@@ -7,7 +7,7 @@ ns.ExportFrame = ExportFrame
 
 local frame, editBox, title, sizeLabel, pageLabel, hintLabel, prevButton, nextButton
 local currentText = ""
-local pages, pageIndex, currentSection = {}, 1, ""
+local pages, pageIndex, currentSection, footer = {}, 1, "", nil
 
 --- Shown above a multi-page export.
 ExportFrame.PAGE_HINT = "Copy every page (Next >). Raid Ledger accepts all pages pasted into one box, in any order."
@@ -114,17 +114,19 @@ local function render()
     setShown(nextButton, paged)
     if prevButton.SetEnabled then prevButton:SetEnabled(pageIndex > 1) end
     if nextButton.SetEnabled then nextButton:SetEnabled(pageIndex < count) end
-    sizeLabel:SetText(string.format("%.1f KB - Ctrl+C, then paste into Raid Ledger -> Import string", #currentText / 1024))
+    sizeLabel:SetText(string.format("%.1f KB - %s", #currentText / 1024, ExportFrame.GetFooter()))
     editBox:SetText(currentText)
     selectAll()
 end
 
+ExportFrame.DEFAULT_FOOTER = "Ctrl+C, then paste into Raid Ledger -> Import string"
+
 --- Show one string, or a list of page strings, for `section`; the (first)
---- page is pre-selected for Ctrl+C.
-function ExportFrame.Show(section, textOrPages)
+--- page is pre-selected for Ctrl+C. `footerText` replaces the default hint.
+function ExportFrame.Show(section, textOrPages, footerText)
     if not frame then create() end
     pages = type(textOrPages) == "table" and textOrPages or { textOrPages }
-    pageIndex, currentSection = 1, section
+    pageIndex, currentSection, footer = 1, section, footerText
     frame:Show()
     render()
 end
@@ -146,6 +148,10 @@ end
 --- Current page number and page count.
 function ExportFrame.GetPage()
     return pageIndex, #pages
+end
+
+function ExportFrame.GetFooter()
+    return footer or ExportFrame.DEFAULT_FOOTER
 end
 
 function ExportFrame.GetPageLabel()

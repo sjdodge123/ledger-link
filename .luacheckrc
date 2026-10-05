@@ -25,6 +25,8 @@ read_globals = {
     "GetNumGroupMembers", "IsInRaid", "GetInstanceInfo",
     -- encoding
     "C_EncodingUtil", "Enum",
+    -- /rl probe (read-only; each one may be missing on the beta)
+    "GetCurrentRegionName", "GetCVar", "GetNormalizedRealmName", "C_GameRules", "C_Seasons",
     -- UI
     "CreateFrame", "UIParent", "UISpecialFrames", "ChatFontNormal",
 }

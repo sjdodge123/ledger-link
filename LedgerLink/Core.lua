@@ -28,6 +28,7 @@ local HELP = {
     "/rl ruleset normal|pvp|rp|hardcore - set this character's ruleset",
     "/rl region us|eu|kr|tw|cn - your region, only needed where the client doesn't report one (beta)",
     "/rl status - show the last export times",
+    "/rl probe - beta checks in one copyable report (paste it to the addon developer)",
     "Paste the string into Raid Ledger: your character -> Import string.",
 }
 
@@ -122,6 +123,8 @@ function ns.HandleSlash(msg)
         runExport(rest ~= "" and rest or "char")
     elseif cmd == "ruleset" then
         setRuleset(rest)
+    elseif cmd == "probe" then
+        ns.Probe.Show()
     elseif cmd == "region" then
         setRegion(rest)
     elseif cmd == "status" then
