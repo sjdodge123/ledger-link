@@ -1,17 +1,38 @@
 # Ledger Link
 
-A World of Warcraft: Forever addon that exports your character as a string you
+A World of Warcraft: Forever addon that exports your character, guild roster and
+boss pulls as strings you
 paste into [Raid Ledger](https://raid.gamernight.net). Addons can't make network
 calls, so Ledger Link works like WeakAuras / Details exports: it builds the
 data, compresses it, and shows it in a box you copy from.
 
 ```
-/rl export char      gear, talents and raid/dungeon lockouts (works now)
-/rl export guild     guild roster            (not yet supported)
-/rl export raid      recorded boss pulls     (not yet supported)
+/rl export char      gear, talents and raid/dungeon lockouts
+/rl export guild     guild roster (up to 2000 members; big guilds come in pages)
+/rl export raid      recorded boss pulls (the last 50)
+/rl raid             how many pulls are recorded
+/rl raid clear       forget recorded pulls
+/rl guildnotes on|off  include PUBLIC notes in the guild export (default off)
 /rl ruleset normal|pvp|rp|hardcore           tell the export your ruleset
-/rl status           last export times
+/rl status           last export times + recorded pull count
 ```
+
+**Guild export.** Officer notes are never read or exported, whatever your rank
+(`canViewOfficerNote` is always `false`). Public notes are left out unless you
+turn them on with `/rl guildnotes on`. A guild of more than 250 members is split
+into pages of 250 (`!RL1!guild-1of3!...`, at most 8 pages = 2000 members). The
+export window shows **Page 1/3** with **< Prev / Next >**: copy every page and
+paste them all into the one Raid Ledger import box, in any order, separated by
+a newline or space. A guild of more than 2000 members keeps you, then online
+members, then the most recently seen, and says how many were left out.
+
+**Raid export.** While the addon is loaded it records every boss pull
+(`ENCOUNTER_START` / `ENCOUNTER_END`): encounter, difficulty, kill or wipe,
+start/end time (unix seconds) and the group roster at the pull (up to 40
+GUIDs + names). The newest **50** pulls are kept in `LedgerLinkDB.raid.pulls`
+(SavedVariables); older ones drop off. There is no damage or DPS data: the
+combat log (`COMBAT_LOG_EVENT_UNFILTERED`) is closed to addons on Forever, so
+Details!/DBM-style log parsing is impossible in-game.
 
 `/ledgerlink` works everywhere `/rl` does (handy if another addon already owns
 `/rl`, which many use as a `/reload` shortcut).
@@ -28,13 +49,40 @@ data, compresses it, and shows it in a box you copy from.
    re-selects it).
 5. In Raid Ledger: your character -> **Import string** -> paste.
 
+## Beta test checklist (operator)
+
+Run these in game on the beta and paste the results back (into the Linear
+story or a GitHub issue). `/console scriptErrors 1` first so Lua errors show.
+
+1. `/dump GetBuildInfo()` and `/dump GetCurrentRegion()` - paste both.
+2. **Char:** `/rl ruleset normal`, `/rl export char`, copy, paste into Raid
+   Ledger's import preview. Paste back: the preview (or error text).
+3. **Guild roster APIs:** `/dump GetNumGuildMembers()` and
+   `/dump GetGuildRosterInfo(1)` (all returns; blank out the officer note
+   before pasting) and `/dump C_GuildInfo and C_GuildInfo.GuildRoster`.
+4. **Guild export:** open the Guild window once, then `/rl export guild`.
+   Paste back: the chat lines it printed (skipped / duplicate / left-out
+   counts, page count), whether **Page x/y** + Prev/Next work, and how long
+   Ctrl+A / Ctrl+C takes on the biggest page (E7). Then paste ALL pages into
+   one Raid Ledger import box (try reversed order too) and paste back the
+   preview's member count.
+5. Repeat 4 with the Guild window's **Show offline members** ticked and
+   unticked - paste back both member counts.
+6. **Raid:** pull a boss (dungeon boss is fine). `/rl raid` should say 1 pull.
+   `/rl export raid`, paste into Raid Ledger, paste back the preview. Note
+   whether the roster count matches your group.
+7. `/reload`, then `/rl raid` - is the pull still there? (SavedVariables bug.)
+8. Any Lua error popup text, verbatim.
+
 ## Reporting a bug
 
 Open an issue with:
 
 - what you typed and what happened;
-- the export string (it holds your character name, gear, talents and lockouts
-  and nothing else - no officer notes, no account data), or
+- the export string (char: your name, gear, talents and lockouts; guild: the
+  roster's names, ranks, levels, classes, online state and - only if you ran
+  `/rl guildnotes on` - public notes; raid: boss pulls and who was in the
+  group. Never officer notes, never account data), or
 - the Lua error text: `/console scriptErrors 1`, reproduce, then copy the error
   popup;
 - the client build: `/dump GetBuildInfo()`.
@@ -43,7 +91,14 @@ Open an issue with:
 
 ```
 !RL1!<section>!<standard base64, padded>( zlib( JSON ) )
+!RL1!guild-<n>of<m>!...   one page of a paged guild export (m <= 8)
 ```
+
+Every page of one guild export repeats the same envelope (`exportedAt`, `who`)
+and the same `name` / `rawRealm` / `snapshotAt`; only `members` is split. The
+server sorts pages by number and refuses a set from different exports, a
+missing page or a member listed twice. The whole paste must stay under the
+server's 256 KB limit; the addon refuses anything bigger.
 
 The JSON is the Raid Ledger contract `AddonExportSchema`
 (`packages/contract/src/wow-addon-export.schema.ts`). Every object is strict:
@@ -69,8 +124,11 @@ busted --lua=luajit
 
 `spec/support/wow_stub.lua` stubs every WoW API the addon calls;
 `C_EncodingUtil` is backed by LibDeflate + pure-Lua base64, so test strings are
-real strings. `tools/verify-with-raid-ledger.sh` decodes generated strings with
-Raid Ledger's actual server decoder (`RAID_LEDGER_DIR=<checkout>`).
+real strings. `tools/verify-with-raid-ledger.sh` decodes the strings
+`tools/gen_strings.lua` generates (char, guild single + 3-page + 8-page +
+over-cap, raid) with Raid Ledger's actual server decoder
+(`RAID_LEDGER_DIR=<checkout>`), and checks that a paged guild paste decodes
+identically with its pages reversed.
 
 ## Beta unknowns (check in game)
 
@@ -91,5 +149,15 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `C_ClassTalents.GetActiveConfigID`, `C_Traits.GetConfigInfo/GetTreeNodes/GetNodeInfo/GenerateImportString` | talent node count in the import preview | `talents.nodes` empty |
 | `GetNumSavedInstances` / `GetSavedInstanceInfo` (14th return `instanceId`) | lockouts in the import preview | lockout rows without an instance id are skipped |
 | `BackdropTemplate`, `UIPanelScrollFrameTemplate`, `UIPanelButtonTemplate`, `UIPanelCloseButton` | the export window looks right | falls back to a plain frame (no border) |
-| Very long strings in an `EditBox` (guild exports, lane 2) | Ctrl+A / Ctrl+C on a large export | paging (`!RL1!guild-1of3!...`) |
-| SavedVariables reload bug (beta) | `/rl status` after a relog | status history is empty; exports still work |
+| Very long strings in an `EditBox` | Ctrl+A / Ctrl+C on the biggest guild page | lower `Guild.MEMBERS_PER_PAGE` (250) |
+| `C_GuildInfo.GuildRoster()` (or legacy `GuildRoster()`) + `GUILD_ROSTER_UPDATE` | `/rl export guild` right after login | "Loading the guild roster..." and no window: run it again |
+| `GetNumGuildMembers()` counts offline members | checklist step 5 | offline members missing unless the Guild window shows them |
+| `GetGuildRosterInfo(i)` return order (name 1, rank 2, rankIndex 3, level 4, note 7, online 9, class token 11, GUID 17) | `/dump GetGuildRosterInfo(1)` | rows "unreadable and skipped"; the officer note (slot 8) is never read either way |
+| Roster names are `"First Surname-<realm>"` | same dump | exported raw; Raid Ledger strips the suffix |
+| `GetGuildRosterLastOnline(i)` (years, months, days) | offline members' "last online" in the preview | `lastOnlineDays` omitted |
+| `GetGuildInfo("player")` 4th return (realm) | guild preview | `rawRealm` falls back to `GetRealmName()` |
+| `ENCOUNTER_START` / `ENCOUNTER_END` fire with IDs on Forever (E5) | `/rl raid` after a boss | no pulls recorded |
+| `UnitGUID("raidN")` / `GetUnitName` readable during an encounter (secret values, E5) | roster count in the raid preview | roster re-read at `ENCOUNTER_END`; empty roster if both are secret |
+| `GetInstanceInfo()` 8th return = instance id | raid preview | `instanceId` omitted |
+| `GetServerTime()` is unix seconds | pull times in the preview | a millisecond value is divided down |
+| SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
