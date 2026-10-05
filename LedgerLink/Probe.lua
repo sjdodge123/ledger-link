@@ -114,6 +114,7 @@ function Probe.Report()
             tostring(LedgerLinkCharDB and LedgerLinkCharDB.ruleset), tostring(LedgerLinkDB and LedgerLinkDB.region),
             #ns.Raid.Pulls()),
     }
+    for _, line in ipairs(ns.Blocked.Lines()) do lines[#lines + 1] = line end
     for _, spec in ipairs(CALLS) do lines[#lines + 1] = describeCall(spec) end
     for _, path in ipairs(PRESENCE) do
         local v = resolve(path)

@@ -8,6 +8,7 @@
 ## SavedVariablesPerCharacter: LedgerLinkCharDB
 
 Core.lua
+Blocked.lua
 Json.lua
 Identity.lua
 Export.lua

@@ -139,7 +139,14 @@ gate. As an optional local cross-check, `tools/verify-with-raid-ledger.sh` decod
 `tools/gen_strings.lua` generates (char, guild single + 3-page + 8-page +
 over-cap, raid) with Raid Ledger's actual server decoder
 (`RAID_LEDGER_DIR=<checkout>`), and checks that a paged guild paste decodes
-identically with its pages reversed.
+identically with its pages reversed. It also decodes the anonymised real
+strings in `spec/fixtures/beta/`, which `spec/contract_spec.lua` validates too.
+
+**Real strings from testers** become fixtures only after
+`luajit tools/anonymise.lua <real.txt> spec/fixtures/beta/<name>.txt`: it
+replaces player names, GUIDs (server id kept), guild names, public notes and
+raid roster names consistently across pages, re-encodes, and fails if any
+original survives. Keep the original paste out of the repo.
 
 ## Beta unknowns (check in game)
 
@@ -171,6 +178,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `UnitGUID("raidN")` / `GetUnitName` readable during an encounter (secret values, E5) | roster count in the raid preview | roster re-read at `ENCOUNTER_END`; empty roster if both are secret |
 | `GetInstanceInfo()` 8th return = instance id | raid preview | `instanceId` omitted |
 | `GetServerTime()` is unix seconds | pull times in the preview | a millisecond value is divided down |
+| "LedgerLink has been blocked from an action only available to the Blizzard UI" (seen on the beta 2026-10-05; clicking Ignore crashed the client) | which function: the addon now records `ADDON_ACTION_FORBIDDEN` / `ADDON_ACTION_BLOCKED` with the preceding `/rl` command, prints it, and `/rl probe` lists it | fix the call it names |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
 
 ## Releases

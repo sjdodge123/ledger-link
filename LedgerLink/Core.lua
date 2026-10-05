@@ -17,6 +17,7 @@ function ns.Init()
     LedgerLinkDB = type(LedgerLinkDB) == "table" and LedgerLinkDB or {}
     LedgerLinkCharDB = type(LedgerLinkCharDB) == "table" and LedgerLinkCharDB or {}
     LedgerLinkDB.lastExport = LedgerLinkDB.lastExport or {}
+    LedgerLinkDB.blocked = LedgerLinkDB.blocked or {}
 end
 
 local HELP = {
@@ -118,6 +119,7 @@ local function raidCommand(arg)
 end
 
 function ns.HandleSlash(msg)
+    ns.lastCommand = "/rl " .. tostring(msg or "")
     local cmd, rest = string.match(string.lower(msg or ""), "^%s*(%S*)%s*(.-)%s*$")
     if cmd == "export" then
         runExport(rest ~= "" and rest or "char")
