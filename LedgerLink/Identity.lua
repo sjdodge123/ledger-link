@@ -37,20 +37,33 @@ local function tuple(a, b)
     return Json.array({ first or Json.null, second or Json.null })
 end
 
+--- Region ids the contract accepts (client.region), by the name players type.
+Identity.REGIONS = { us = 1, kr = 2, eu = 3, tw = 4, cn = 5 }
+
+--- GetCurrentRegion() when it is a real region (1-5). The WoW: Forever beta
+--- returns 90 (portal "test"), so there the player's choice (/rl region) is used.
+function Identity.Region()
+    local region = ns.SafeCall(GetCurrentRegion)
+    if type(region) == "number" and region >= 1 and region <= 5 then
+        return math.floor(region)
+    end
+    local chosen = Identity.REGIONS[LedgerLinkDB and LedgerLinkDB.region or ""]
+    if chosen then return chosen end
+    return nil, "This client doesn't report a real region (GetCurrentRegion returned "
+        .. tostring(region) .. "). Set yours once with /rl region us|eu|kr|tw|cn."
+end
+
 function Identity.Client()
     local version, build, _, interface = ns.SafeCall(GetBuildInfo)
-    local region = ns.SafeCall(GetCurrentRegion)
-    if type(region) ~= "number" or region < 1 or region > 5 then
-        return nil, "Couldn't read your region (GetCurrentRegion returned "
-            .. tostring(region) .. "). Please report this."
-    end
+    local region, regionErr = Identity.Region()
+    if not region then return nil, regionErr end
     local buildString = tostring(version or "?")
     if build then buildString = buildString .. "." .. tostring(build) end
     return {
         interface = ns.AsId(interface) or 0,
         build = ns.Clip(buildString, 32),
         locale = ns.Clip(ns.SafeCall(GetLocale), 8) or "",
-        region = math.floor(region),
+        region = region,
     }
 end
 

@@ -12,6 +12,7 @@ Json.lua
 Identity.lua
 Export.lua
 ExportFrame.lua
+Probe.lua
 Sections\Char.lua
 Sections\Guild.lua
 Sections\Raid.lua
