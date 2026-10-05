@@ -18,9 +18,16 @@ function ns.Init()
     LedgerLinkCharDB = type(LedgerLinkCharDB) == "table" and LedgerLinkCharDB or {}
     LedgerLinkDB.lastExport = LedgerLinkDB.lastExport or {}
     LedgerLinkDB.blocked = LedgerLinkDB.blocked or {}
+    if ns.Minimap then ns.Minimap.Init() end
+end
+
+--- Settings changed from a slash command or the panel: keep the panel in step.
+local function changed()
+    if ns.Panel then ns.Panel.Refresh() end
 end
 
 local HELP = {
+    "/rl - open the Ledger Link panel (or click the minimap button)",
     "/rl export char - export this character (gear, talents, lockouts)",
     "/rl export guild - export the guild roster (big guilds come in pages)",
     "/rl export raid - export recorded boss pulls (last 50)",
@@ -30,6 +37,7 @@ local HELP = {
     "/rl region us|eu|kr|tw|cn - your region, only needed where the client doesn't report one (beta)",
     "/rl status - show the last export times",
     "/rl probe - beta checks in one copyable report (paste it to the addon developer)",
+    "/rl minimap on|off - show or hide the minimap button",
     "Paste the string into Raid Ledger: your character -> Import string.",
 }
 
@@ -38,22 +46,37 @@ local function showHelp()
     for _, line in ipairs(HELP) do print("  " .. line) end
 end
 
+--- Set this character's ruleset ("normal", "pvp", "rp"/"roleplaying", "hardcore"/"hc").
+function ns.SetRuleset(value)
+    local ruleset = RULESET_ALIASES[value or ""]
+    if not ruleset then return false end
+    LedgerLinkCharDB.ruleset = ruleset
+    changed()
+    return true, ruleset
+end
+
 local function setRuleset(arg)
-    local ruleset = RULESET_ALIASES[arg or ""]
-    if not ruleset then
+    local ok, ruleset = ns.SetRuleset(arg)
+    if not ok then
         ns.Print("Usage: /rl ruleset normal|pvp|rp|hardcore")
         return
     end
-    LedgerLinkCharDB.ruleset = ruleset
     ns.Print("Ruleset set to " .. ruleset .. ".")
 end
 
+--- Region used only when the game doesn't report one (the beta).
+function ns.SetRegion(name)
+    if not ns.Identity.REGIONS[name or ""] then return false end
+    LedgerLinkDB.region = name
+    changed()
+    return true
+end
+
 local function setRegion(arg)
-    if not ns.Identity.REGIONS[arg or ""] then
+    if not ns.SetRegion(arg) then
         ns.Print("Usage: /rl region us|eu|kr|tw|cn")
         return
     end
-    LedgerLinkDB.region = arg
     ns.Print("Region set to " .. arg .. ". It is only used when the game doesn't report one (the beta).")
 end
 
@@ -94,9 +117,15 @@ local function showExport(section)
     ns.ExportFrame.Show(section, pages)
 end
 
-local function runExport(section)
+--- Export `section` ("char", "guild", "raid") into the copy window.
+function ns.RunExport(section)
     if inCombat() then return end
     ns.Export.Prepare(section, function() showExport(section) end)
+end
+
+function ns.SetGuildNotes(on)
+    LedgerLinkDB.guildNotes = on and true or false
+    changed()
 end
 
 local function setGuildNotes(arg)
@@ -104,13 +133,27 @@ local function setGuildNotes(arg)
         ns.Print("Usage: /rl guildnotes on|off (public notes only; officer notes are never exported)")
         return
     end
-    LedgerLinkDB.guildNotes = arg == "on"
+    ns.SetGuildNotes(arg == "on")
     ns.Print("Public guild notes will " .. (arg == "on" and "" or "not ") .. "be included in /rl export guild.")
+end
+
+function ns.ClearPulls()
+    ns.Raid.Clear()
+    changed()
+end
+
+local function minimapCommand(arg)
+    if arg ~= "on" and arg ~= "off" then
+        ns.Print("Usage: /rl minimap on|off")
+        return
+    end
+    ns.Minimap.SetShown(arg == "on")
+    ns.Print("Minimap button " .. (arg == "on" and "shown." or "hidden. /rl minimap on brings it back."))
 end
 
 local function raidCommand(arg)
     if arg == "clear" then
-        ns.Raid.Clear()
+        ns.ClearPulls()
         ns.Print("Recorded boss pulls cleared.")
     else
         ns.Print(string.format("%d boss pull(s) recorded. /rl export raid to export, /rl raid clear to forget them.",
@@ -121,8 +164,10 @@ end
 function ns.HandleSlash(msg)
     ns.lastCommand = "/rl " .. tostring(msg or "")
     local cmd, rest = string.match(string.lower(msg or ""), "^%s*(%S*)%s*(.-)%s*$")
-    if cmd == "export" then
-        runExport(rest ~= "" and rest or "char")
+    if cmd == "" then
+        ns.Panel.Toggle()
+    elseif cmd == "export" then
+        ns.RunExport(rest ~= "" and rest or "char")
     elseif cmd == "ruleset" then
         setRuleset(rest)
     elseif cmd == "probe" then
@@ -135,6 +180,8 @@ function ns.HandleSlash(msg)
         setGuildNotes(rest)
     elseif cmd == "raid" then
         raidCommand(rest)
+    elseif cmd == "minimap" then
+        minimapCommand(rest)
     else
         showHelp()
     end

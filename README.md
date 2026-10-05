@@ -7,6 +7,9 @@ calls, so Ledger Link works like WeakAuras / Details exports: it builds the
 data, compresses it, and shows it in a box you copy from.
 
 ```
+/rl                  open the Ledger Link panel (or click the minimap button)
+/rl help             list the commands
+/rl minimap on|off   show or hide the minimap button
 /rl export char      gear, talents and raid/dungeon lockouts
 /rl export guild     guild roster (up to 2000 members; big guilds come in pages)
 /rl export raid      recorded boss pulls (the last 50)
@@ -35,6 +38,14 @@ GUIDs + names). The newest **50** pulls are kept in `LedgerLinkDB.raid.pulls`
 (SavedVariables); older ones drop off. There is no damage or DPS data: the
 combat log (`COMBAT_LOG_EVENT_UNFILTERED`) is closed to addons on Forever, so
 Details!/DBM-style log parsing is impossible in-game.
+
+**Panel.** `/rl` or the minimap button opens a small window with the three
+export buttons, ruleset buttons, the public-guild-notes checkbox, the recorded
+pull count (with Clear), a Beta probe button, and, only when the game doesn't
+report a region (the beta), region buttons. Every control does exactly what the
+matching slash command does. Drag the minimap button around the minimap edge;
+its position is saved. The addon list shows the Ledger Link icon
+(`## IconTexture`, `Textures/Icon.tga`).
 
 `/ledgerlink` works everywhere `/rl` does (handy if another addon already owns
 `/rl`, which many use as a `/reload` shortcut).
@@ -166,6 +177,8 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `GetInventoryItemID` / `GetInventoryItemLink` / `C_Item.GetDetailedItemLevelInfo` | gear count + item levels in the import preview | slot skipped / `ilvl` omitted |
 | `C_ClassTalents.GetActiveConfigID`, `C_Traits.GetConfigInfo/GetTreeNodes/GetNodeInfo/GenerateImportString` | talent node count in the import preview | `talents.nodes` empty |
 | `GetNumSavedInstances` / `GetSavedInstanceInfo` (14th return `instanceId`) | lockouts in the import preview | lockout rows without an instance id are skipped |
+| `## IconTexture` + uncompressed 32-bit TGA textures | Ledger Link shows its icon in the AddOns list (not the red "?"); the minimap button shows the round icon | default "?" icon / blank minimap button |
+| `UICheckButtonTemplate`, minimap textures (`MiniMap-TrackingBorder`, `UI-Minimap-Background`, `UI-Minimap-ZoomButton-Highlight`), `GetCursorPosition` | the panel checkbox and the minimap button look right and drag | cosmetic only |
 | `BackdropTemplate`, `UIPanelScrollFrameTemplate`, `UIPanelButtonTemplate`, `UIPanelCloseButton` | the export window looks right | falls back to a plain frame (no border) |
 | Very long strings in an `EditBox` | Ctrl+A / Ctrl+C on the biggest guild page | lower `Guild.MEMBERS_PER_PAGE` (250) |
 | Requesting the roster from an addon (`C_GuildInfo.GuildRoster()`) | **not the cause** of the beta popup (alpha5 still showed it); the addon no longer requests the roster anyway: the client has it after login | the export waits for the roster the Guild window loads (`GUILD_ROSTER_UPDATE`) |

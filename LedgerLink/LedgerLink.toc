@@ -4,6 +4,7 @@
 ## Author: sjdodge123
 ## Version: @project-version@
 ## X-Curse-Project-ID: 1728299
+## IconTexture: Interface\AddOns\LedgerLink\Textures\Icon
 ## SavedVariables: LedgerLinkDB
 ## SavedVariablesPerCharacter: LedgerLinkCharDB
 
@@ -12,8 +13,11 @@ Blocked.lua
 Json.lua
 Identity.lua
 Export.lua
+UI.lua
 ExportFrame.lua
 Probe.lua
+Panel.lua
+Minimap.lua
 Sections\Char.lua
 Sections\Guild.lua
 Sections\Raid.lua

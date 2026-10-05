@@ -17,17 +17,6 @@ local pages, pageIndex, currentSection, footer = {}, 1, "", nil
 --- Shown above a multi-page export.
 ExportFrame.PAGE_HINT = "Copy every page (Next >). Raid Ledger accepts all pages pasted into one box, in any order."
 
-local function createBackdrop(f)
-    if f.SetBackdrop then
-        f:SetBackdrop({
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 32, edgeSize = 32,
-            insets = { left = 11, right = 12, top = 12, bottom = 11 },
-        })
-    end
-end
-
 local function createEditBox(parent)
     local scroll = CreateFrame("ScrollFrame", "LedgerLinkExportScroll", parent, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 20, -58)
@@ -52,37 +41,17 @@ local function createEditBox(parent)
     return box
 end
 
-local function button(parent, text, width, onClick)
-    local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    b:SetSize(width, 22)
-    b:SetText(text)
-    b:SetScript("OnClick", onClick)
-    return b
-end
-
 local function createButtons(parent)
-    prevButton = button(parent, "< Prev", 70, function() ExportFrame.PrevPage() end)
+    prevButton = ns.UI.Button(parent, "< Prev", 70, function() ExportFrame.PrevPage() end)
     prevButton:SetPoint("BOTTOMLEFT", 20, 16)
-    nextButton = button(parent, "Next >", 70, function() ExportFrame.NextPage() end)
+    nextButton = ns.UI.Button(parent, "Next >", 70, function() ExportFrame.NextPage() end)
     nextButton:SetPoint("BOTTOMLEFT", 170, 16)
     pageLabel = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     pageLabel:SetPoint("BOTTOMLEFT", 95, 21)
-    local close = CreateFrame("Button", nil, parent, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -6, -6)
 end
 
 local function create()
-    local ok, f = pcall(CreateFrame, "Frame", "LedgerLinkExportFrame", UIParent, "BackdropTemplate")
-    if not ok then f = CreateFrame("Frame", "LedgerLinkExportFrame", UIParent) end
-    f:SetSize(600, 400)
-    f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    createBackdrop(f)
+    local f = ns.UI.Window("LedgerLinkExportFrame", 600, 400)
     title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -18)
     sizeLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -93,10 +62,6 @@ local function create()
     frame = f
     editBox = createEditBox(f)
     createButtons(f)
-    -- Escape closes the window even when the edit box isn't focused.
-    if type(UISpecialFrames) == "table" then
-        table.insert(UISpecialFrames, "LedgerLinkExportFrame")
-    end
 end
 
 local function setShown(widget, shown)
