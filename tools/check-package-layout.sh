@@ -24,5 +24,9 @@ extra=$(grep -vxF -f <(echo "$allowed") <<<"$entries" || true)
 missing=$(grep -vxF -f <(echo "$entries") <<<"$allowed" | grep -Ev '^LedgerLink/(LICENSE|CHANGELOG.md)$' || true)
 [ -z "$missing" ] || { echo "FAIL: .toc lists files missing from the zip:" >&2; echo "$missing" >&2; fail=1; }
 
+# The packager must have substituted every @project-...@ keyword (e.g. the version).
+leftover=$(unzip -p "$zip" '*.toc' '*.lua' | grep -o '@project-[a-z-]*@' | sort -u || true)
+[ -z "$leftover" ] || { echo "FAIL: unsubstituted keywords: $leftover" >&2; fail=1; }
+
 [ "$fail" -eq 0 ] && echo "OK: $zip layout"
 exit "$fail"

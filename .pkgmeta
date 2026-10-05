@@ -9,6 +9,7 @@ ignore:
   - spec
   - tools
   - contract
+  - media
   - node_modules
   - package.json
   - package-lock.json
