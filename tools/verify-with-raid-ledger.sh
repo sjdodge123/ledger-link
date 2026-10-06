@@ -6,6 +6,10 @@
 # Ledger checkout; the decode script lives in a temp dir.
 #
 #   RAID_LEDGER_DIR=/path/to/Raid-Ledger-checkout tools/verify-with-raid-ledger.sh
+#
+# "Export all" strings (all-*.txt) need a Raid Ledger with ROK-1737
+# (decodeImportPaste); with an older checkout they are skipped, not failed.
+# TSX overrides the TypeScript runner (default: npx --no-install tsx in api/).
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,12 +25,33 @@ if command -v luarocks >/dev/null; then eval "$(luarocks --lua-version=5.1 path)
 # Anonymised real strings from the beta (tools/anonymise.lua) must decode too.
 for f in "$REPO"/spec/fixtures/beta/*.txt; do [ -e "$f" ] && cp "$f" "$TMP/beta-$(basename "$f")"; done
 
+MIXED=false
+grep -q "export function decodeImportPaste" "$DECODER" && MIXED=true
+echo "Raid Ledger decoder: $DECODER (mixed paste: $MIXED)"
+
 cat > "$TMP/decode.ts" <<TS
 import { readFileSync, readdirSync } from 'node:fs';
-import { decodeImportString } from '$DECODER';
+import * as decoder from '$DECODER';
+const { decodeImportString } = decoder;
+const decodeImportPaste = (decoder as any).decodeImportPaste;
 let failed = 0;
 const seen = new Map<string, { sha256: string; guids: string }>();
 for (const file of readdirSync('$TMP').filter((f) => f.endsWith('.txt')).sort()) {
+  if (file.startsWith('all-')) {
+    if (!decodeImportPaste) { console.log('SKIP', file, '(needs Raid Ledger with ROK-1737)'); continue; }
+    try {
+      const r = decodeImportPaste(readFileSync('$TMP/' + file, 'utf8'));
+      const parts = r.order.map((s: string) => s + ':' + r.sections[s].pages);
+      const guids = new Set(r.order.map((s: string) => r.sections[s].payload.who.guid));
+      if (guids.size !== 1) throw new Error('sections from different exporters');
+      console.log('OK  ', file, JSON.stringify({ sections: parts.join(' '), tokens: r.tokens, inputBytes: r.inputBytes }));
+    } catch (err) {
+      failed++;
+      const e = err as { code?: string; message?: string };
+      console.log('FAIL', file, e.code ?? '', e.message ?? String(err));
+    }
+    continue;
+  }
   try {
     const { payload, pages, sha256, inputBytes } = decodeImportString(readFileSync('$TMP/' + file, 'utf8'));
     const p = payload as any;
@@ -64,4 +89,4 @@ if (failed) { console.log(failed + ' string(s) failed to decode'); process.exit(
 console.log('all strings decoded with zero errors');
 TS
 
-cd "$RL/api" && npx --no-install tsx "$TMP/decode.ts"
+cd "$RL/api" && ${TSX:-npx --no-install tsx} "$TMP/decode.ts"

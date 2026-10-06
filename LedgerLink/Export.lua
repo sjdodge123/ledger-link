@@ -13,7 +13,7 @@ Export.MAX_STRING_BYTES = 200 * 1024
 --- The whole paste (every page + separators) must fit the server's
 --- ADDON_IMPORT_MAX_BYTES (wow-addon-import.schema.ts).
 Export.MAX_PASTE_BYTES = 262144
---- Server ADDON_IMPORT_MAX_PAGES: pages accepted in one paste.
+--- Server ADDON_IMPORT_MAX_PAGES: pages of one guild export.
 Export.MAX_PAGES = 8
 
 local builders = {}
@@ -135,3 +135,34 @@ function Export.Run(section)
     if not pages then return nil, err end
     return table.concat(pages, "\n")
 end
+
+--- "Export all" (Raid Ledger ROK-1737, CONTRACT.md §5.1): the char string,
+--- every guild page and the raid string, each in its own single-section
+--- format, for one paste. Sections that don't apply are left out with a note:
+--- no guild, or no recorded pulls. Returns tokens, notes or nil, error.
+function Export.RunAll()
+    local tokens, notes = {}, {}
+    local char, charErr = Export.RunPages("char")
+    if not char then return nil, charErr end
+    tokens[1] = char[1]
+    if ns.SafeCall(GetGuildInfo, "player") then
+        local guild, guildErr = Export.RunPages("guild")
+        if not guild then return nil, "Guild export: " .. tostring(guildErr) end
+        for _, page in ipairs(guild) do tokens[#tokens + 1] = page end
+    else
+        notes[#notes + 1] = "You're not in a guild, so there's no guild section."
+    end
+    if #ns.Raid.Pulls() > 0 then
+        local raid, raidErr = Export.RunPages("raid")
+        if not raid then return nil, "Raid export: " .. tostring(raidErr) end
+        tokens[#tokens + 1] = raid[1]
+    else
+        notes[#notes + 1] = "There are no boss pulls recorded, so there's no raid section."
+    end
+    if #table.concat(tokens, "\n") > Export.MAX_PASTE_BYTES then
+        return nil, "That's too big for one paste. Export the guild on its own (/rl export guild),"
+            .. " then the rest (/rl export char, /rl export raid)."
+    end
+    return tokens, notes
+end
+
