@@ -18,7 +18,7 @@ data, compresses it, and shows it in a box you copy from.
 /rl raid clear       forget recorded pulls
 /rl guildnotes on|off  include PUBLIC notes in the guild export (default off)
 /rl ruleset normal|pvp|rp|hardcore           tell the export your ruleset
-/rl region us|eu|kr|tw|cn   your region; only used when the game doesn't report one (beta)
+/rl region us|eu|kr|tw|cn   your region; only used when the game doesn't report one (beta). Raid Ledger has no China region: cn exports won't import
 /rl status           last export times + recorded pull count
 /rl probe            all beta checks in one copyable report (for bug reports)
 ```

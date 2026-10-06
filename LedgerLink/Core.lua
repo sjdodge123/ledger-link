@@ -69,6 +69,11 @@ end
 function ns.SetRegion(name)
     if not ns.Identity.REGIONS[name or ""] then return false end
     LedgerLinkDB.region = name
+    if name == "cn" then
+        -- The wire format allows 5 (it mirrors GetCurrentRegion), but Raid Ledger
+        -- characters are us/eu/kr/tw only: a cn import fails with REGION_MISMATCH.
+        ns.Print("Note: Raid Ledger can't import China-region characters, so exports with region cn won't import.")
+    end
     changed()
     return true
 end
