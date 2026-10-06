@@ -26,7 +26,7 @@ local function clientRegionKnown()
 end
 
 local function create()
-    local f = ns.UI.Window("LedgerLinkPanel", 320, 330)
+    local f = ns.UI.Window("LedgerLinkPanel", 320, 358)
     title = ns.UI.Label(f, nil, "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -18)
 
@@ -44,6 +44,12 @@ local function create()
         b:SetPoint("TOPLEFT", x, y)
         x = x + 92
     end
+    y = y - 26
+    local all = ns.UI.Button(f, "Export all (one paste)", 272, function()
+        ns.lastCommand = "panel: export all"
+        ns.RunExport("all")
+    end, "LedgerLinkPanelExportAll")
+    all:SetPoint("TOPLEFT", 24, y)
 
     y = y - 34
     rulesetLabel = ns.UI.Label(f)

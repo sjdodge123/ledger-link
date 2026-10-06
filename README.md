@@ -13,6 +13,7 @@ data, compresses it, and shows it in a box you copy from.
 /rl export char      gear, talents and raid/dungeon lockouts
 /rl export guild     guild roster (up to 2000 members; big guilds come in pages)
 /rl export raid      recorded boss pulls (the last 50)
+/rl export all       character + guild + raid in one box: copy once, paste once
 /rl raid             how many pulls are recorded
 /rl raid clear       forget recorded pulls
 /rl guildnotes on|off  include PUBLIC notes in the guild export (default off)
@@ -39,8 +40,15 @@ GUIDs + names). The newest **50** pulls are kept in `LedgerLinkDB.raid.pulls`
 combat log (`COMBAT_LOG_EVENT_UNFILTERED`) is closed to addons on Forever, so
 Details!/DBM-style log parsing is impossible in-game.
 
-**Panel.** `/rl` or the minimap button opens a small window with the three
-export buttons, ruleset buttons, the public-guild-notes checkbox, the recorded
+**Export all.** `/rl export all` (or the panel's **Export all** button) shows
+the character string, every guild page and the raid string in one box, one per
+line, to paste into Raid Ledger in one go (Raid Ledger ROK-1737, CONTRACT.md
+§5.1). Each string keeps its normal format. No guild or no recorded pulls?
+That section is left out and the chat says so. A paste over Raid Ledger's
+256 KB limit is refused with a hint to export the guild on its own.
+
+**Panel.** `/rl` or the minimap button opens a small window with the export
+buttons (including Export all), ruleset buttons, the public-guild-notes checkbox, the recorded
 pull count (with Clear), a Beta probe button, and, only when the game doesn't
 report a region (the beta), region buttons. Every control does exactly what the
 matching slash command does. Drag the minimap button around the minimap edge;
@@ -149,7 +157,9 @@ decodes `contract/v1/fixtures/` once Raid Ledger publishes them; that is the CI
 gate. As an optional local cross-check, `tools/verify-with-raid-ledger.sh` decodes the strings
 `tools/gen_strings.lua` generates (char, guild single + 3-page + 8-page +
 over-cap, raid) with Raid Ledger's actual server decoder
-(`RAID_LEDGER_DIR=<checkout>`), and checks that a paged guild paste decodes
+(`RAID_LEDGER_DIR=<checkout>`; Export all strings need a checkout with
+ROK-1737, otherwise they are skipped; `TSX=<path to tsx>` if the checkout has
+no `node_modules`), and checks that a paged guild paste decodes
 identically with its pages reversed. It also decodes the anonymised real
 strings in `spec/fixtures/beta/`, which `spec/contract_spec.lua` validates too.
 

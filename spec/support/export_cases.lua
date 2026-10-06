@@ -35,13 +35,22 @@ local cases = {
     { name = "guild-2100-capped", section = "guild",
         setup = function() WowStub.state.guildRoster = WowStub.roster(2100) end },
     { name = "raid-1-pull", section = "raid", setup = function(ns) raidPulls(ns, 1, 40) end },
+    -- "Export all" (ROK-1737): one paste, one string per section, one per line.
+    { name = "all-char-guild-raid", section = "all", setup = function(ns) raidPulls(ns, 3, 25) end },
+    { name = "all-char-guild3-raid", section = "all", setup = function(ns)
+        WowStub.state.guildRoster = WowStub.roster(600)
+        raidPulls(ns, 2, 40)
+    end },
+    { name = "all-char-only", section = "all", setup = function() WowStub.state.guild = nil end },
     { name = "raid-50-pulls-ring-full", section = "raid", setup = function(ns) raidPulls(ns, 60, 40) end },
 }
 
 -- Returns the export pages (strings) for one case, from a freshly loaded addon.
+-- For "all" these are the paste's tokens (char, guild pages, raid).
 local function run(case)
     local ns = loadAddon()
     case.setup(ns)
+    if case.section == "all" then return assert(ns.Export.RunAll()) end
     return assert(ns.Export.RunPages(case.section))
 end
 

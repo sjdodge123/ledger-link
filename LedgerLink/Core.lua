@@ -31,6 +31,7 @@ local HELP = {
     "/rl export char - export this character (gear, talents, lockouts)",
     "/rl export guild - export the guild roster (big guilds come in pages)",
     "/rl export raid - export recorded boss pulls (last 50)",
+    "/rl export all - character, guild and raid in one box: paste them into Raid Ledger together",
     "/rl raid clear - forget recorded boss pulls",
     "/rl guildnotes on|off - include public notes in the guild export (default off)",
     "/rl ruleset normal|pvp|rp|hardcore - set this character's ruleset",
@@ -117,9 +118,27 @@ local function showExport(section)
     ns.ExportFrame.Show(section, pages)
 end
 
---- Export `section` ("char", "guild", "raid") into the copy window.
+local function showAll()
+    if inCombat() then return end
+    local tokens, notes = ns.Export.RunAll()
+    if not tokens then
+        ns.Print(notes)
+        return
+    end
+    local text = table.concat(tokens, "\n")
+    LedgerLinkDB.lastExport.all = { at = time(), bytes = #text, pages = #tokens }
+    for _, note in ipairs(notes) do ns.Print(note) end
+    ns.ExportFrame.Show("all", text, ns.ExportFrame.ALL_FOOTER)
+end
+
+--- Export `section` ("char", "guild", "raid", or "all") into the copy window.
 function ns.RunExport(section)
     if inCombat() then return end
+    if section == "all" then
+        -- The guild roster may need loading first; Guild.Prepare is a no-op outside a guild.
+        ns.Export.Prepare("guild", showAll)
+        return
+    end
     ns.Export.Prepare(section, function() showExport(section) end)
 end
 

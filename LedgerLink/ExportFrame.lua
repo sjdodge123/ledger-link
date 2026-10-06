@@ -72,7 +72,8 @@ local function render()
     local count = #pages
     currentText = pages[pageIndex] or ""
     local paged = count > 1
-    title:SetText("Ledger Link - " .. currentSection .. " export")
+    title:SetText(currentSection == "all" and "Ledger Link - export all"
+        or ("Ledger Link - " .. currentSection .. " export"))
     pageLabel:SetText(paged and string.format("Page %d/%d", pageIndex, count) or "")
     setShown(pageLabel, paged)
     setShown(hintLabel, paged)
@@ -86,6 +87,7 @@ local function render()
 end
 
 ExportFrame.DEFAULT_FOOTER = "Click the text, Ctrl+C, then paste into Raid Ledger -> Import string"
+ExportFrame.ALL_FOOTER = "Click the text, Ctrl+C, then paste it all at once into Raid Ledger -> Import string"
 
 --- Show one string, or a list of page strings, for `section`; the (first)
 --- page is pre-selected for Ctrl+C. `footerText` replaces the default hint.
