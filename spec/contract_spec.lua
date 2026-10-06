@@ -71,27 +71,31 @@ describe("contract/v1", function()
         local dir = os.tmpname()
         os.remove(dir)
         assert(shell("mkdir -p '" .. dir .. "'"))
-        local files = {}
-        for i, json in ipairs(result.jsons) do
-            files[i] = string.format("'%s/page%d.json'", dir, i)
-            local f = assert(io.open(files[i]:sub(2, -2), "w"))
-            f:write(json)
-            f:close()
+        local files, pageSections, payloads = {}, {}, {}
+        for _, g in ipairs(result.groups) do
+            for i, json in ipairs(g.jsons) do
+                local n = #files + 1
+                files[n] = string.format("'%s/page%d.json'", dir, n)
+                local f = assert(io.open(files[n]:sub(2, -2), "w"))
+                f:write(json)
+                f:close()
+                pageSections[n], payloads[n] = g.sections[i], g.payloads[i]
+            end
         end
         local valid = shell("node tools/validate-contract.mjs " .. table.concat(files, " "))
         shell("rm -rf '" .. dir .. "'")
         if not valid then return nil, "INVALID_PAYLOAD" end
-        for i, payload in ipairs(result.payloads) do
-            if payload.section ~= result.sections[i] then return nil, "INVALID_PAYLOAD" end
+        for i, payload in ipairs(payloads) do
+            if payload.section ~= pageSections[i] then return nil, "INVALID_PAYLOAD" end
         end
         return result
     end
 
-    local function merged(result)
-        local first = result.payloads[1]
+    local function merged(group)
+        local first = group.payloads[1]
         if first.section ~= "guild" then return first end
         local members = {}
-        for _, p in ipairs(result.payloads) do
+        for _, p in ipairs(group.payloads) do
             for _, m in ipairs(p.data.members) do members[#members + 1] = m end
         end
         first.data.members = members
@@ -105,12 +109,21 @@ describe("contract/v1", function()
             local result, code = importAndValidate(readFile(name .. ".txt"))
             assert(result, name .. ": rejected with " .. tostring(code))
             local expected = dkjson.decode(readFile(name .. ".json"), 1, dkjson.null)
-            assert.equal(expected.pages, result.pages, name)
-            local got, want = merged(result), expected.payload
-            for field in pairs(SERVER_NORMALISED[got.section] or {}) do
-                got.data[field], want.data[field] = nil, nil
+            -- Mixed paste (CONTRACT.md §8): { sections = { {section, pages, payload}, ... } }
+            -- in canonical order char -> guild -> raid; single: { pages, payload }.
+            local want = expected.sections or { { section = result.groups[1].section,
+                pages = expected.pages, payload = expected.payload } }
+            assert.equal(#want, #result.groups, name .. ": section count")
+            for i, w in ipairs(want) do
+                local g = result.groups[i]
+                assert.equal(w.section, g.section, name)
+                assert.equal(w.pages, g.pages, name .. " " .. g.section)
+                local got = merged(g)
+                for field in pairs(SERVER_NORMALISED[got.section] or {}) do
+                    got.data[field], w.payload.data[field] = nil, nil
+                end
+                assert.same(w.payload, got, name .. " " .. g.section)
             end
-            assert.same(want, got, name)
         end
     end)
 

@@ -1,4 +1,5 @@
--- Test-side mirror of Raid Ledger's decodeImportString guard order, raising
+-- Test-side mirror of Raid Ledger's decodeImportPaste guard order (incl. the
+-- ROK-1737 mixed paste, CONTRACT.md §5.1), raising
 -- {code = ...} with the server's error codes so contract/v1/fixtures/invalid/
 -- can be checked. Limits are Raid Ledger's (packages/contract/src/
 -- wow-addon-import.schema.ts). Schema validation (INVALID_PAYLOAD) is not done
@@ -9,7 +10,10 @@ local dkjson = require("dkjson")
 
 local MAX_BYTES = 262144 -- ADDON_IMPORT_MAX_BYTES
 local MAX_DECODED_BYTES = 1048576 -- ADDON_IMPORT_MAX_DECODED_BYTES
-local MAX_PAGES = 8 -- ADDON_IMPORT_MAX_PAGES
+local MAX_PAGES = 8 -- ADDON_IMPORT_MAX_PAGES (one guild export's pages)
+local MAX_TOKENS = 10 -- ADDON_IMPORT_MAX_TOKENS (whole paste: 8 guild pages + char + raid)
+local SAME_EXPORT_WINDOW = 600 -- ADDON_IMPORT_SAME_EXPORT_WINDOW_SECONDS
+local ORDER = { "char", "guild", "raid" } -- canonical section order (CONTRACT.md §5.1)
 local ENVELOPE_VERSION = 1 -- ADDON_EXPORT_ENVELOPE_VERSION
 local SECTIONS = { char = true, guild = true, raid = true }
 
@@ -53,6 +57,53 @@ local function decodePage(header)
     return { json = json, payload = payload }
 end
 
+-- One section's tokens: a single string, or (guild only) one complete page set.
+local function groupHeaders(section, headers)
+    if #headers == 1 then return assertPageSet(headers) end
+    if section ~= "guild" then fail("PAGES_INCOMPLETE") end -- a second char/raid string
+    for _, h in ipairs(headers) do
+        if not h.page then fail("PAGES_INCOMPLETE") end -- a second guild export
+    end
+    return assertPageSet(headers)
+end
+
+-- resolveExportName: first non-empty of fullName, raw.getUnitName,
+-- raw.unitFullName joined; realm suffix dropped; whitespace collapsed;
+-- compared case-insensitively (NFC is a no-op for the ASCII test data).
+local function exportName(who)
+    local tuple = {}
+    for _, part in ipairs(type(who.raw.unitFullName) == "table" and who.raw.unitFullName or {}) do
+        if type(part) == "string" and part ~= "" then tuple[#tuple + 1] = part end
+    end
+    for _, candidate in ipairs({ who.fullName, who.raw.getUnitName, table.concat(tuple, " ") }) do
+        local name = (type(candidate) == "string" and candidate or ""):gsub("%-.*$", "")
+        name = name:gsub("%s+", " "):match("^%s*(.-)%s*$")
+        if name ~= "" then return name:lower() end
+    end
+    return ""
+end
+
+local function assertSameExporter(groups)
+    if #groups < 2 then return end
+    local first = groups[1].payloads[1]
+    local low, high = first.exportedAt, first.exportedAt
+    for _, g in ipairs(groups) do
+        local p = g.payloads[1]
+        if p.who.guid ~= first.who.guid or p.client.region ~= first.client.region
+            or exportName(p.who) ~= exportName(first.who) then
+            fail("INVALID_PAYLOAD")
+        end
+        low, high = math.min(low, p.exportedAt), math.max(high, p.exportedAt)
+    end
+    if high - low > SAME_EXPORT_WINDOW then fail("INVALID_PAYLOAD") end
+end
+
+-- Returns { groups = { { section, pages, sections = {per page}, jsons = {page JSON},
+-- payloads = {...} }, ... } } in canonical order (char, guild, raid). For a
+-- single-section paste the first group's fields are also copied to the top
+-- level. Schema checks are the caller's (tools/validate-contract.mjs); the
+-- same-exporter check needs decoded payloads and so runs only when every page
+-- parsed as JSON.
 -- Returns { pages = n, sections = {...}, jsons = {page JSON, sorted}, payloads = {...} }.
 return function(raw)
     local input = raw:match("^%s*(.-)%s*$")
@@ -60,14 +111,29 @@ return function(raw)
     if input == "" then fail("BAD_HEADER") end
     local tokens = {}
     for token in input:gmatch("%S+") do tokens[#tokens + 1] = token end
-    if #tokens > MAX_PAGES then fail("PAGES_INCOMPLETE") end
+    if #tokens > MAX_TOKENS then fail("PAGES_INCOMPLETE") end
     local headers = {}
     for i, token in ipairs(tokens) do headers[i] = parseHeader(token) end
-    headers = assertPageSet(headers)
-    local result = { pages = #headers, sections = {}, jsons = {}, payloads = {} }
-    for i, h in ipairs(headers) do
-        local page = decodePage(h)
-        result.sections[i], result.jsons[i], result.payloads[i] = h.section, page.json, page.payload
+    local groups = {}
+    for _, section in ipairs(ORDER) do
+        local mine = {}
+        for _, h in ipairs(headers) do
+            if h.section == section then mine[#mine + 1] = h end
+        end
+        if #mine > 0 then groups[#groups + 1] = { section = section, headers = groupHeaders(section, mine) } end
+    end
+    for _, g in ipairs(groups) do
+        g.pages, g.sections, g.jsons, g.payloads = #g.headers, {}, {}, {}
+        for i, h in ipairs(g.headers) do
+            local page = decodePage(h)
+            g.sections[i], g.jsons[i], g.payloads[i] = h.section, page.json, page.payload
+        end
+    end
+    local ok, err = pcall(assertSameExporter, groups)
+    if not ok and type(err) == "table" then error(err, 0) end
+    local result = { groups = groups }
+    if #groups == 1 then
+        for k, v in pairs(groups[1]) do result[k] = v end
     end
     return result
 end
