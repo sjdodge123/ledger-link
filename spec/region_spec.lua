@@ -67,3 +67,39 @@ describe("region", function()
         assert.is_true(shown)
     end)
 end)
+
+-- Raid Ledger characters have no China region (WowRegionSchema is us/eu/kr/tw,
+-- and WoW: Forever has no cn realms), so a cn string decodes and then fails at
+-- import with REGION_MISMATCH. The wire format still allows 5, so cn stays
+-- selectable, with a warning, from both the slash command and the panel.
+describe("region cn", function()
+    local function warned()
+        for _, line in ipairs(WowStub.printed) do
+            if line:find("can't import China", 1, true) then return true end
+        end
+        return false
+    end
+
+    it("warns that Raid Ledger can't import China-region characters (slash)", function()
+        local ns = loadAddon()
+        ns.HandleSlash("region cn")
+        assert.equal("cn", LedgerLinkDB.region)
+        assert.is_true(warned())
+    end)
+
+    it("warns from the panel's CN button too", function()
+        local ns = loadAddon()
+        WowStub.state.region = 90
+        ns.Panel.Show()
+        local b = WowStub.frames.LedgerLinkPanelRegioncn
+        b.scripts.OnClick(b, "LeftButton")
+        assert.equal("cn", LedgerLinkDB.region)
+        assert.is_true(warned())
+    end)
+
+    it("doesn't warn for us/eu/kr/tw", function()
+        local ns = loadAddon()
+        for _, r in ipairs({ "us", "eu", "kr", "tw" }) do ns.HandleSlash("region " .. r) end
+        assert.is_false(warned())
+    end)
+end)
