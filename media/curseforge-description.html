@@ -1,37 +1,50 @@
 <p>Ledger Link sends your <strong>World of Warcraft: Forever</strong> character, guild roster and raid boss pulls to <strong><a href="https://raid.gamernight.net">Raid Ledger</a></strong>, so your roster, gear and raid history stay current without retyping anything.</p>
 
-<p>Addons can't connect to the internet, so Ledger Link works like WeakAuras or Details! exports. It builds the data, compresses it into a single string, and shows it in a box. You copy the string and paste it into Raid Ledger.</p>
+<p>Addons can't connect to the internet, so Ledger Link works like WeakAuras or Details! exports. It builds the data, compresses it into a string, and shows it in a box. You copy the string and paste it into Raid Ledger.</p>
+
+<h2>How to use it</h2>
+<ol>
+<li>Click the <strong>Ledger Link minimap button</strong> (or type <code>/rl</code>) to open the panel.</li>
+<li>Pick your realm's ruleset once on each character: <strong>Normal</strong>, <strong>PvP</strong>, <strong>RP</strong> or <strong>Hardcore</strong>.</li>
+<li>Click <strong>Export all (one paste)</strong>. A box opens with your character, guild and raid strings.</li>
+<li><strong>Click the text</strong> to select all of it, then press <strong>Ctrl+C</strong>.</li>
+<li>In Raid Ledger, open your character, choose <strong>Import string</strong>, and paste.</li>
+</ol>
+<p>You can also export each part on its own with the <strong>Character</strong>, <strong>Guild</strong> and <strong>Raid</strong> buttons.</p>
+
+<h2>What it exports</h2>
+<ul>
+<li><strong>Character:</strong> your gear, talents, and raid and dungeon lockouts.</li>
+<li><strong>Guild:</strong> your guild roster, up to 2,000 members, with names, ranks, levels, classes and when each member was last online.</li>
+<li><strong>Raid:</strong> your last 50 boss pulls. While the addon is loaded, it records each pull by itself: the encounter, difficulty, kill or wipe, start and end times, and who was in your group. It doesn't record damage or DPS, because WoW: Forever doesn't let addons read the combat log.</li>
+</ul>
+<p>A guild with more than 250 members exports in pages. <strong>Export all</strong> puts every page in the same box. If you export the guild on its own, use <strong>Next &gt;</strong> to step through the pages, copy each one, and paste them all into the same import box, in any order.</p>
 
 <h2>Commands</h2>
 <table>
 <thead><tr><th>Command</th><th>What it does</th></tr></thead>
 <tbody>
-<tr><td><code>/rl export char</code></td><td>Your gear, talents and raid/dungeon lockouts</td></tr>
-<tr><td><code>/rl export guild</code></td><td>Your guild roster (up to 2,000 members)</td></tr>
-<tr><td><code>/rl export raid</code></td><td>Your last 50 recorded boss pulls</td></tr>
-<tr><td><code>/rl ruleset normal | pvp | rp | hardcore</code></td><td>Sets your realm ruleset (do this once per character)</td></tr>
-<tr><td><code>/rl guildnotes on | off</code></td><td>Adds public notes to the guild export (off by default)</td></tr>
-<tr><td><code>/rl raid</code> / <code>/rl raid clear</code></td><td>Shows or clears your recorded pulls</td></tr>
+<tr><td><code>/rl</code></td><td>Opens the Ledger Link panel</td></tr>
+<tr><td><code>/rl export all</code></td><td>Character, guild and raid in one box, pasted into Raid Ledger together</td></tr>
+<tr><td><code>/rl export char</code> | <code>guild</code> | <code>raid</code></td><td>Exports one part on its own</td></tr>
+<tr><td><code>/rl ruleset normal | pvp | rp | hardcore</code></td><td>Sets this character's realm ruleset</td></tr>
+<tr><td><code>/rl guildnotes on | off</code></td><td>Adds public guild notes to the guild export (off by default)</td></tr>
+<tr><td><code>/rl raid</code> / <code>/rl raid clear</code></td><td>Shows or clears your recorded boss pulls</td></tr>
+<tr><td><code>/rl region us | eu | kr | tw</code></td><td>Your region, only needed if the game doesn't report it (the panel shows these buttons when that happens)</td></tr>
+<tr><td><code>/rl minimap on | off</code></td><td>Shows or hides the minimap button</td></tr>
 <tr><td><code>/rl status</code></td><td>Shows your last export times</td></tr>
+<tr><td><code>/rl probe</code></td><td>A diagnostic report to include in bug reports</td></tr>
+<tr><td><code>/rl help</code></td><td>Lists every command</td></tr>
 </tbody>
 </table>
 <p><code>/ledgerlink</code> works the same as <code>/rl</code>, in case another addon already uses <code>/rl</code>.</p>
 
-<h2>How to use it</h2>
-<ol>
-<li>Type <code>/rl ruleset normal</code> (or <code>pvp</code>, <code>rp</code>, <code>hardcore</code>) once on each character.</li>
-<li>Run an export, for example <code>/rl export char</code>. The text is already selected, so press <strong>Ctrl+C</strong>.</li>
-<li>In Raid Ledger, open your character, choose <strong>Import string</strong>, and paste.</li>
-</ol>
-<p><strong>Big guilds:</strong> a guild with more than 250 members exports in pages. Use <strong>Next &gt;</strong> to step through them, copy every page, and paste them all into the same import box, in any order.</p>
-<p><strong>Raid pulls:</strong> while the addon is loaded, it records each boss pull: the encounter, difficulty, kill or wipe, start and end times, and who was in the group. It keeps the newest 50. It does not record damage or DPS, because WoW: Forever doesn't let addons read the combat log.</p>
-
 <h2>Privacy</h2>
 <ul>
 <li><strong>Officer notes are never read or exported</strong>, whatever your guild rank.</li>
-<li>Public guild notes are only included if you turn them on with <code>/rl guildnotes on</code>.</li>
+<li>Public guild notes are only included if you turn them on.</li>
 <li>Nothing leaves your game unless you copy a string and paste it somewhere yourself.</li>
 </ul>
 
-<h2>Status</h2>
-<p>This is an <strong>alpha</strong> for the WoW: Forever beta. If something breaks, please open an issue and include the Lua error text (if any) and your <code>/rl status</code> output.</p>
+<h2>Feedback and bugs</h2>
+<p>Leave a comment here. If something breaks, include the Lua error text (if there is one) and the report from <code>/rl probe</code>: click the text, press Ctrl+C, and paste it into your comment.</p>
