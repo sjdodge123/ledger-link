@@ -40,23 +40,49 @@ end
 --- Region ids the contract accepts (client.region), by the name players type.
 Identity.REGIONS = { us = 1, kr = 2, eu = 3, tw = 4, cn = 5 }
 
---- GetCurrentRegion() when it is a real region (1-5). The WoW: Forever beta
---- returns 90 (portal "test"), so there the player's choice (/rl region) is used.
+--- Game language -> region, used only when the client doesn't report a region
+--- (the WoW: Forever beta returns 90) and the player hasn't picked one, so
+--- players never have to type /rl region. A guess, shown as one; never saved.
+Identity.LOCALE_REGION = {
+    enUS = "us", esMX = "us", ptBR = "us",
+    enGB = "eu", deDE = "eu", frFR = "eu", esES = "eu", itIT = "eu", ruRU = "eu", ptPT = "eu",
+    koKR = "kr", zhTW = "tw", zhCN = "cn",
+}
+
+--- The region id (1-5) and where it came from: "client" (GetCurrentRegion,
+--- expected on live), "set" (/rl region or the panel) or "guessed" (game
+--- language; unknown languages guess us). Never nil.
 function Identity.Region()
     local region = ns.SafeCall(GetCurrentRegion)
     if type(region) == "number" and region >= 1 and region <= 5 then
-        return math.floor(region)
+        return math.floor(region), "client"
     end
     local chosen = Identity.REGIONS[LedgerLinkDB and LedgerLinkDB.region or ""]
-    if chosen then return chosen end
-    return nil, "This client doesn't report a real region (GetCurrentRegion returned "
-        .. tostring(region) .. "). Set yours once with /rl region us|eu|kr|tw|cn."
+    if chosen then return chosen, "set" end
+    local guess = Identity.LOCALE_REGION[ns.SafeCall(GetLocale) or ""] or "us"
+    return Identity.REGIONS[guess], "guessed"
+end
+
+--- The region's short name ("us", "eu", ...).
+function Identity.RegionName()
+    local id = Identity.Region()
+    for name, value in pairs(Identity.REGIONS) do
+        if value == id then return name end
+    end
+end
+
+--- For the panel and /rl status; nil when the game reports the region itself.
+function Identity.RegionText()
+    local _, source = Identity.Region()
+    if source == "client" then return nil end
+    local name = Identity.RegionName()
+    if source == "set" then return name end
+    return name .. " (guessed from your game language; /rl region to change)"
 end
 
 function Identity.Client()
     local version, build, _, interface = ns.SafeCall(GetBuildInfo)
-    local region, regionErr = Identity.Region()
-    if not region then return nil, regionErr end
+    local region = Identity.Region()
     local buildString = tostring(version or "?")
     if build then buildString = buildString .. "." .. tostring(build) end
     return {

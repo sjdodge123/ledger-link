@@ -35,7 +35,7 @@ local HELP = {
     "/rl raid clear - forget recorded boss pulls",
     "/rl guildnotes on|off - include public notes in the guild export (default off)",
     "/rl ruleset normal|pvp|rp|hardcore - set this character's ruleset",
-    "/rl region us|eu|kr|tw|cn - your region, only needed where the client doesn't report one (beta)",
+    "/rl region us|eu|kr|tw|cn - override the region where the game doesn't report one (beta; otherwise guessed from your game language)",
     "/rl status - show the last export times",
     "/rl probe - beta checks in one copyable report (paste it to the addon developer)",
     "/rl minimap on|off - show or hide the minimap button",
@@ -97,7 +97,8 @@ local function showStatus()
     ns.Print(string.format("Recorded boss pulls: %d (max %d)", #ns.Raid.Pulls(), ns.Raid.MAX_PULLS))
     local rulesetText = ns.Identity.RulesetText()
     ns.Print("Ruleset: " .. (rulesetText == "not set" and "not set (/rl ruleset)" or rulesetText))
-    if LedgerLinkDB.region then ns.Print("Region: " .. LedgerLinkDB.region .. " (used if the game doesn't report one)") end
+    local regionText = ns.Identity.RegionText()
+    if regionText then ns.Print("Region: " .. regionText) end
 end
 
 local function inCombat()

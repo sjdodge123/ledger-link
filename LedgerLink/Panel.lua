@@ -65,7 +65,7 @@ local function create()
     end
 
     y = y - 30
-    regionLabel = ns.UI.Label(f, "Region (the beta doesn't report it):")
+    regionLabel = ns.UI.Label(f)
     regionLabel:SetPoint("TOPLEFT", 24, y)
     x = 24
     for _, name in ipairs(REGIONS) do
@@ -111,9 +111,11 @@ function Panel.Refresh()
     end
     local needRegion = not clientRegionKnown()
     setShown(regionLabel, needRegion)
+    local regionName, regionSource = ns.Identity.RegionName(), select(2, ns.Identity.Region())
+    regionLabel:SetText("Region: " .. regionName:upper() .. (regionSource == "guessed" and " (guessed, click to change)" or ""))
     for name, b in pairs(regionButtons) do
         setShown(b, needRegion)
-        if name == LedgerLinkDB.region then b:LockHighlight() else b:UnlockHighlight() end
+        if name == regionName then b:LockHighlight() else b:UnlockHighlight() end
     end
     notesBox:SetChecked(LedgerLinkDB.guildNotes and true or false)
     pullsLabel:SetText(Panel.GetPullsText())

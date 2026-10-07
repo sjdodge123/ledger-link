@@ -28,6 +28,9 @@ local cases = {
         WowStub.state.region = 90 -- what the WoW: Forever beta reports
         ns.HandleSlash("region eu")
     end },
+    { name = "char-beta-region-90-guessed-from-enGB", section = "char", setup = function()
+        WowStub.state.region, WowStub.state.locale = 90, "enGB" -- no /rl region: guessed eu
+    end },
     { name = "guild-small-single-page", section = "guild", setup = function() end },
     { name = "guild-notes-on", section = "guild", setup = function(ns) ns.HandleSlash("guildnotes on") end },
     { name = "guild-600-3pages", section = "guild", reversed = true,

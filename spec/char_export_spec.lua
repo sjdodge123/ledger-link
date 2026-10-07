@@ -89,12 +89,11 @@ describe("/rl export char", function()
         assert.equals("roleplaying", exportChar().payload.who.ruleset)
     end)
 
-    it("region is an integer 1-5 and refuses anything else", function()
-        assert.is_true(isInt(exportChar().payload.client.region))
+    it("region is the client's 1-5, else a picked or guessed region (never outside 1-5)", function()
+        assert.equal(1, exportChar().payload.client.region)
         WowStub.state.region = 72
-        local str, err = ns.Export.Run("char")
-        assert.is_nil(str)
-        assert.truthy(err:find("region"))
+        local region = exportChar().payload.client.region
+        assert.is_true(isInt(region) and region >= 1 and region <= 5)
     end)
 
     it("char data matches the contract shape", function()
