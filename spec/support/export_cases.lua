@@ -16,6 +16,8 @@ end
 local cases = {
     { name = "char-full-normal", section = "char", setup = function(ns) ns.HandleSlash("ruleset normal") end },
     { name = "char-roleplaying", section = "char", setup = function(ns) ns.HandleSlash("ruleset rp") end },
+    { name = "char-hardcore-detected", section = "char",
+        setup = function() _G.C_GameRules = { IsHardcoreActive = function() return true end } end },
     { name = "char-ruleset-null-no-guild-empty", section = "char", setup = function()
         local s = WowStub.state
         s.guild, s.gear, s.lockouts, s.talentConfigId = nil, {}, {}, nil

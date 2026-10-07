@@ -38,7 +38,7 @@ local function showTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("Ledger Link " .. ns.VERSION)
     GameTooltip:AddLine("Click: open the panel. Drag: move this button.", 1, 1, 1)
-    GameTooltip:AddLine("Ruleset: " .. (LedgerLinkCharDB.ruleset or "not set"), 1, 1, 1)
+    GameTooltip:AddLine("Ruleset: " .. ns.Identity.RulesetText(), 1, 1, 1)
     GameTooltip:AddLine(string.format("Recorded boss pulls: %d", #ns.Raid.Pulls()), 1, 1, 1)
     GameTooltip:Show()
 end

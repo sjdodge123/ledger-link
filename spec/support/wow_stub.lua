@@ -97,6 +97,7 @@ function WowStub.reset()
     WowStub.state = defaultState()
     for i = #printed, 1, -1 do printed[i] = nil end
     _G.LedgerLinkDB, _G.LedgerLinkCharDB = nil, nil
+    _G.C_GameRules = nil -- tests that need it set their own
 end
 WowStub.reset()
 
