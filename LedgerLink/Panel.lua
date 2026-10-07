@@ -104,8 +104,8 @@ end
 function Panel.Refresh()
     if not frame then return end
     title:SetText("Ledger Link " .. ns.VERSION)
-    local ruleset = LedgerLinkCharDB and LedgerLinkCharDB.ruleset
-    rulesetLabel:SetText("Ruleset: " .. (ruleset or "not set"))
+    local ruleset = ns.Identity.Ruleset()
+    rulesetLabel:SetText("Ruleset: " .. ns.Identity.RulesetText())
     for value, b in pairs(rulesetButtons) do
         if value == ruleset then b:LockHighlight() else b:UnlockHighlight() end
     end
