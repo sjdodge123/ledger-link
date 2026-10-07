@@ -1,6 +1,8 @@
 -- The WoW: Forever beta reports GetCurrentRegion() = 90 (portal "test",
 -- GetCurrentRegionName() = ""), outside the contract's 1-5. Then, and only
--- then, the player's own choice (/rl region) is sent.
+-- then, the player's own choice (/rl region) is sent, or, if they haven't
+-- picked one, a region guessed from the game language (operator 2026-10-07:
+-- players shouldn't have to type /rl region).
 local loadAddon = require("spec.support.load_addon")
 local decode = require("spec.support.decode")
 
@@ -20,12 +22,39 @@ describe("region", function()
         assert.equal(3, exportRegion(ns))
     end)
 
-    it("on the beta (region 90) refuses until the player picks one, and says how", function()
+    it("on the beta guesses the region from the game language when none was picked", function()
+        local cases = {
+            enUS = 1, esMX = 1, ptBR = 1,
+            enGB = 3, deDE = 3, frFR = 3, esES = 3, itIT = 3, ruRU = 3,
+            koKR = 2, zhTW = 4,
+            xxXX = 1, -- unknown language: US
+        }
+        for locale, id in pairs(cases) do
+            WowStub.state.region = 90
+            WowStub.state.locale = locale
+            assert.equal(id, exportRegion(ns), locale)
+        end
+        assert.is_nil(LedgerLinkDB.region) -- a guess is never saved
+    end)
+
+    it("a picked region wins over the guess", function()
         WowStub.state.region = 90
-        local region, err = exportRegion(ns)
-        assert.is_nil(region)
-        assert.truthy(err:find("90", 1, true))
-        assert.truthy(err:find("/rl region", 1, true))
+        WowStub.state.locale = "deDE"
+        ns.HandleSlash("region us")
+        assert.equal(1, exportRegion(ns))
+    end)
+
+    it("says when the region was guessed, in /rl status and the panel", function()
+        WowStub.state.region = 90
+        WowStub.state.locale = "enGB"
+        ns.HandleSlash("status")
+        local said = false
+        for _, line in ipairs(WowStub.printed) do
+            said = said or line:find("Region: eu (guessed from your game language", 1, true) ~= nil
+        end
+        assert.is_true(said)
+        ns.Panel.Show()
+        assert.is_true(WowStub.frames.LedgerLinkPanelRegioneu.highlighted)
     end)
 
     it("on the beta sends the region the player picked", function()

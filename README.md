@@ -18,7 +18,7 @@ data, compresses it, and shows it in a box you copy from.
 /rl raid clear       forget recorded pulls
 /rl guildnotes on|off  include PUBLIC notes in the guild export (default off)
 /rl ruleset normal|pvp|rp|hardcore           tell the export your ruleset
-/rl region us|eu|kr|tw|cn   your region; only used when the game doesn't report one (beta). Raid Ledger has no China region: cn exports won't import
+/rl region us|eu|kr|tw|cn   override the region; only used when the game doesn't report one (beta), where it is otherwise guessed from the game language. Raid Ledger has no China region: cn exports won't import
 /rl status           last export times + recorded pull count
 /rl probe            all beta checks in one copyable report (for bug reports)
 ```
@@ -65,8 +65,9 @@ its position is saved. The addon list shows the Ledger Link icon
    (you should end up with `AddOns/LedgerLink/LedgerLink.toc`).
 2. In game, `/reload` (or log in), and make sure **Ledger Link** is ticked in
    the AddOns list on the character screen.
-3. `/rl ruleset normal` (or `pvp`, `rp`, `hardcore`) once per character. On the beta
-   also `/rl region us` (or `eu`, `kr`, `tw`, `cn`) once: the beta client reports a test region.
+3. `/rl ruleset normal` (or `pvp`, `rp`, `hardcore`) once per character. On the
+   beta the region is guessed from the game language (the client reports a test
+   region); `/rl region us` (or `eu`, `kr`, `tw`) corrects a wrong guess.
 4. `/rl export char`, then **click the text** (that selects all of it) and
    Ctrl+C.
 5. In Raid Ledger: your character -> **Import string** -> paste.
@@ -180,7 +181,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `C_EncodingUtil.CompressString(s, Enum.CompressionMethod.Zlib, Enum.CompressionLevel.OptimizeForSize)` | export works at all | "C_EncodingUtil is missing" / "Compression failed" |
 | `C_EncodingUtil.EncodeBase64` alphabet + padding | string pastes cleanly | URL-safe / unpadded output is normalised to standard padded either way |
 | `UnitRace("player")` on new Forever races | "High Order Skyborne", token `"Skyborne"`, id 95 (probe 2026-10-05); the contract takes any race string ≤ 32 chars, so it exports | - |
-| `GetCurrentRegion()` returns 1-5 | **no on the beta**: it returns `90`; `GetCurrentRegionName()` is `""` and the `portal` CVar is `"test"` (2026-10-05) | outside 1-5 the player's `/rl region` choice is sent; without one the export asks for it. Live clients are expected to return 1-5 |
+| `GetCurrentRegion()` returns 1-5 | **no on the beta**: it returns `90`; `GetCurrentRegionName()` is `""` and the `portal` CVar is `"test"` (2026-10-05). Expected 1-4 on live: confirm with `/rl probe` on launch day | outside 1-5 the player's `/rl region` pick is sent, else a region guessed from `GetLocale()` (enUS/esMX/ptBR → us; enGB/deDE/frFR/esES/itIT/ruRU/ptPT → eu; koKR → kr; zhTW → tw; zhCN → cn; unknown → us), shown as "guessed" |
 | `UnitGUID("player")` is `Player-<n>-<8 hex>` | **confirmed** on the beta (2026-10-05) | export refuses with "Unexpected player GUID format" |
 | `GetUnitName("player", true)` returns "First Surname" | **confirmed** (probe, 2026-10-05); `UnitName`/`UnitFullName` return (first, surname), not a realm | `fullName` falls back to `UnitFullName` |
 | `GetRealmName()` on a realmless client | beta returns `"Classic Beta PvP"` (probe, 2026-10-05) | stored raw only; the server ignores it |
