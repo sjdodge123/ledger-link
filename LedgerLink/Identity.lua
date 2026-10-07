@@ -91,11 +91,35 @@ function ns.NormalizeGuid(guid)
     return prefix .. digits .. "-" .. string.upper(hex)
 end
 
-local function ruleset()
+--- The client has no realm-type API. C_GameRules.IsHardcoreActive() exists
+--- on the WoW: Forever beta (false on PvP and PvE realms; true on Hardcore is
+--- UNVERIFIED, see README "Beta unknowns"). Only a real `true` counts.
+local function detectRuleset()
+    local rules = C_GameRules
+    if type(rules) == "table" and ns.SafeCall(rules.IsHardcoreActive) == true then return "hardcore" end
+    return nil
+end
+
+--- This character's ruleset and where it came from: the player's own pick
+--- ("set") always wins, else what the game reports ("detected"), else nil.
+function Identity.Ruleset()
     local db = LedgerLinkCharDB
     local value = type(db) == "table" and db.ruleset or nil
-    if RULESETS[value] then return value end
-    return Json.null
+    if RULESETS[value] then return value, "set" end
+    local detected = detectRuleset()
+    if detected then return detected, "detected" end
+    return nil
+end
+
+--- "pvp", "hardcore (detected)" or "not set", for the panel, tooltip and status.
+function Identity.RulesetText()
+    local value, source = Identity.Ruleset()
+    if not value then return "not set" end
+    return source == "detected" and (value .. " (detected)") or value
+end
+
+local function ruleset()
+    return Identity.Ruleset() or Json.null
 end
 
 function Identity.Who()

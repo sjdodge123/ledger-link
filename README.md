@@ -17,7 +17,7 @@ data, compresses it, and shows it in a box you copy from.
 /rl raid             how many pulls are recorded
 /rl raid clear       forget recorded pulls
 /rl guildnotes on|off  include PUBLIC notes in the guild export (default off)
-/rl ruleset normal|pvp|rp|hardcore           tell the export your ruleset
+/rl ruleset normal|pvp|rp|hardcore           tell the export your ruleset (Hardcore is detected automatically)
 /rl region us|eu|kr|tw|cn   your region; only used when the game doesn't report one (beta). Raid Ledger has no China region: cn exports won't import
 /rl status           last export times + recorded pull count
 /rl probe            all beta checks in one copyable report (for bug reports)
@@ -184,7 +184,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `UnitGUID("player")` is `Player-<n>-<8 hex>` | **confirmed** on the beta (2026-10-05) | export refuses with "Unexpected player GUID format" |
 | `GetUnitName("player", true)` returns "First Surname" | **confirmed** (probe, 2026-10-05); `UnitName`/`UnitFullName` return (first, surname), not a realm | `fullName` falls back to `UnitFullName` |
 | `GetRealmName()` on a realmless client | beta returns `"Classic Beta PvP"` (probe, 2026-10-05) | stored raw only; the server ignores it |
-| No ruleset API exists | `C_GameRules` exists on the beta. Probes (2026-10-05): "Classic Beta PvP" → `GetCurrentGameModeRecordID()` **14**; "Classic Beta PvE 2" → **15**. `GetForeverExperiencePreset()` (1), `GetActiveGameMode()` (1) and `IsStandard()` (true) are the same on both. RecordID may track the ruleset or just the realm: needs an RP realm and a second PvP or PvE realm. `IsHardcoreActive()` exists (false on both) | set it with `/rl ruleset` or the panel; otherwise `null` |
+| No ruleset API exists | `C_GameRules` exists on the beta. **Hardcore is auto-detected**: when the player hasn't picked a ruleset and `C_GameRules.IsHardcoreActive()` returns `true`, the export sends `hardcore` (shown as "hardcore (detected)"); the player's own pick always wins. `IsHardcoreActive()` was `false` on a PvP and a PvE realm; **`true` on a Hardcore character is unverified**: run `/rl probe` there. Normal/PvP/RP: `GetCurrentGameModeRecordID()` was 14 ("Classic Beta PvP") and 15 ("Classic Beta PvE 2"), other `C_GameRules` values equal; whether it tracks the ruleset needs an RP realm and a second PvP/PvE realm, and re-checking on live | set it with `/rl ruleset` or the panel; otherwise `null` (Raid Ledger may fill it from the realm) |
 | `GetInventoryItemID` / `GetInventoryItemLink` / `C_Item.GetDetailedItemLevelInfo` | gear count + item levels in the import preview | slot skipped / `ilvl` omitted |
 | `C_ClassTalents.GetActiveConfigID`, `C_Traits.GetConfigInfo/GetTreeNodes/GetNodeInfo/GenerateImportString` | talent node count in the import preview | `talents.nodes` empty |
 | `GetNumSavedInstances` / `GetSavedInstanceInfo` (14th return `instanceId`) | lockouts in the import preview | lockout rows without an instance id are skipped |

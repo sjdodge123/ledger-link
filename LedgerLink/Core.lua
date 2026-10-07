@@ -95,7 +95,8 @@ local function showStatus()
     end
     if not any then ns.Print("No exports yet. Try /rl export char") end
     ns.Print(string.format("Recorded boss pulls: %d (max %d)", #ns.Raid.Pulls(), ns.Raid.MAX_PULLS))
-    ns.Print("Ruleset: " .. (LedgerLinkCharDB.ruleset or "not set (/rl ruleset)"))
+    local rulesetText = ns.Identity.RulesetText()
+    ns.Print("Ruleset: " .. (rulesetText == "not set" and "not set (/rl ruleset)" or rulesetText))
     if LedgerLinkDB.region then ns.Print("Region: " .. LedgerLinkDB.region .. " (used if the game doesn't report one)") end
 end
 
