@@ -16,7 +16,7 @@ Read-only probes; nothing new is exported.
 | 2d | `C_Traits.GetEntryInfo(configId, entryId).definitionID` | yes | yes | `130656` → `135457` |
 | 2e | `C_Traits.GetDefinitionInfo(definitionId).spellID` | yes | yes | `135457` → `20504` |
 | 2f | `C_Spell.GetSpellName(spellID)` | yes | yes | `20504` → "Improved Intercept"; `12328` → "Death Wish"; `12319` → "Flurry" |
-| 3 | `C_QuestLog.GetAllCompletedQuestIDs()` | yes | yes | **40** ids at level 8 (first: 456, 457, 458, 459, 475); a level 6 Druid on Zephras Isle: **16** (first: 92460-92464, Forever-specific ids). **Max-level count still to come.** |
+| 3 | `C_QuestLog.GetAllCompletedQuestIDs()` | yes | yes | **40** ids at level 8 (first: 456, 457, 458, 459, 475); a level 6 Druid on Zephras Isle: **16** (first: 92460-92464, Forever-specific ids); a level 8 Paladin: **75**. **Max-level count still to come.** |
 | 4a | `C_QuestLog.GetNumQuestLogEntries()` | yes | yes | `15, 12` (entries incl. headers, quests) |
 | 4b | `C_QuestLog.GetInfo(i)` | yes | yes | headers (`isHeader`, title "Teldrassil") and quests (`questID` 488, title "Zenn's Bidding") |
 | 4c | `C_QuestLog.GetQuestObjectives(questID)` | yes | yes | `{ text = "2/3 Nightsaber Fang", finished = false, numFulfilled = 2, numRequired = 3, objectiveType = 1, type = "item" }`; types seen: `item`, `monster`, `log`; quest 98391 has **no** objectives (empty) |
@@ -39,11 +39,16 @@ Rows: posY 2130 (8), 2730 (8), 3330 (9), 3930 (10), 4530 (9), 5130 (5), 5730 (3)
 **Mapping:** columns and rows are 600 apart; the gap between sub-trees is about
 2200. So:
 
-- `tree` = which column group (cluster posX values; a gap > 600 starts a new group),
-  0-2 left to right, which matches the in-game tab order (Arms, Fury, Protection
-  for Warrior);
-- `col` = (posX - the group's first posX) / 600, 0-3;
-- `row` = (posY - 2130) / 600, 0-6.
+- `tree` = which column group (cluster posX values: a gap well over 600, about 2200
+  in practice, starts a new group), 0-2 left to right, which matches the in-game
+  tab order (Arms, Fury, Protection for Warrior);
+- `col` = **round**((posX - the group's first posX) / 600), 0-3;
+- `row` = **round**((posY - 2130) / 600), 0-6.
+
+**Round, don't divide exactly.** Positions can be off by a few units: the Paladin
+tree has posX **5020 and 5030** in the same column (13 distinct posX values, not
+12). Clustering by gaps and rounding to the nearest 600 step handles it; counting
+distinct values or testing exact multiples does not.
 
 Caveat: the groups' first columns differ (1020, 5020, **9080**), so `col` must be
 measured from each group's own first column, not one global origin.
@@ -57,6 +62,13 @@ Spirit), matching tab order Balance, Feral, Restoration. So the grid coordinates
 shared across classes, and the rule above holds for both. Two of the sampled
 spells have post-classic ids (Wild Growth 408120, Living Spirit 1309631): don't
 assume classic spell ids.
+
+**Third class (Paladin, tree 1100, level 8):** **50** nodes, not 52. posX 1020(4)
+1620(6) 2220(6) 2820(1) | 5020(1) **5030(2)** 5620(6) 6220(5) 6820(2) | 9080(4) 9680(6)
+10280(6) 10880(1); rows are the same 7 values. Sub-trees hold 17 / 16 / 17 nodes.
+Group 0 is Holy (Light's Vigil 1310911, Holy Power 5923, Holy Shock 1311606),
+matching tab order Holy, Protection, Retribution. So node counts vary by class, the
+grid is shared, and posX can be off by about 10.
 
 ## Sizes
 
