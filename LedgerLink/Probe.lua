@@ -294,6 +294,256 @@ local function s3Size(lines, completed)
     lines[#lines + 1] = line
 end
 
+-- ---------------------------------------------------------------------------
+-- "S4": as much as one probe can tell (operator 2026-10-09, before a dungeon
+-- run). Group + instance, recorded pulls, the whole quest log with tags,
+-- dungeon quest flags, lockouts, the computed talent grid, discovery of
+-- Forever's "legacy talents" / "legacy challenges" (global name scan, C_Traits
+-- systems, achievement categories) and character extras. Functions are looked
+-- up by name (resolve), so anything this client lacks reports "missing".
+
+local function fn(path) return resolve(path) end
+
+local function simple(lines, specs)
+    for _, spec in ipairs(specs) do lines[#lines + 1] = "S4 " .. describeCall(spec) end
+end
+
+local function readable(value, pattern)
+    return (type(value) == "string" and value ~= "" and (not pattern or value:match(pattern))) and "readable"
+        or "unreadable"
+end
+
+local function s4Group(lines)
+    simple(lines, { { "IsInGroup" }, { "IsInRaid" }, { "GetNumGroupMembers" }, { "GetNumSubgroupMembers" } })
+    for k = 1, 4 do
+        local unit = "party" .. k
+        local _, exists = call(fn("UnitExists"), unit)
+        if exists then
+            local _, guid = call(fn("UnitGUID"), unit)
+            local _, name = call(fn("GetUnitName"), unit, true)
+            -- Readability only: other players' GUIDs and names are never printed.
+            lines[#lines + 1] = string.format("S4 %s: exists guid=%s name=%s", unit,
+                readable(guid, "^Player%-"), readable(name))
+        end
+    end
+end
+
+local function s4Instance(lines)
+    simple(lines, { { "GetDungeonDifficultyID" }, { "GetRaidDifficultyID" }, { "GetZoneText" },
+        { "GetRealZoneText" }, { "GetSubZoneText" } })
+    local status, mapId = call(fn("C_Map.GetBestMapForUnit"), "player")
+    if status ~= "ok" then
+        lines[#lines + 1] = "S4 map: C_Map.GetBestMapForUnit " .. status
+        return
+    end
+    local _, info = call(fn("C_Map.GetMapInfo"), mapId)
+    lines[#lines + 1] = string.format('S4 map: C_Map.GetBestMapForUnit("player") = %s -> GetMapInfo = %s',
+        format(mapId, 0), format(info, 0))
+    local ejStatus, ejId = call(fn("EJ_GetInstanceForMap"), mapId)
+    if ejStatus ~= "ok" then
+        lines[#lines + 1] = "S4 dungeon guide: EJ_GetInstanceForMap " .. ejStatus
+        return
+    end
+    local results = { call(fn("EJ_GetInstanceInfo"), ejId) }
+    local text = results[1] == "ok" and formatResults({ unpack(results, 2, table.maxn(results)) },
+        table.maxn(results) - 1) or results[1]
+    lines[#lines + 1] = string.format("S4 dungeon guide: EJ_GetInstanceForMap(%s) = %s -> EJ_GetInstanceInfo = %s",
+        format(mapId, 0), format(ejId, 0), text)
+end
+
+local function s4Pulls(lines)
+    local pulls = ns.Raid.Pulls()
+    if #pulls == 0 then
+        lines[#lines + 1] = "S4 pulls: none recorded"
+        return
+    end
+    for k = math.max(1, #pulls - 4), #pulls do
+        local p = pulls[k]
+        lines[#lines + 1] = string.format('S4 pull %d: encounterId=%s %s difficultyId=%s groupSize=%s success=%s'
+            .. ' roster=%d instanceId=%s startAt=%s endAt=%s', k, tostring(p.encounterId), format(p.name, 0),
+            tostring(p.difficultyId), tostring(p.groupSize), tostring(p.success),
+            type(p.roster) == "table" and #p.roster or 0, tostring(p.instanceId), tostring(p.startAt),
+            tostring(p.endAt))
+    end
+end
+
+local function s4Quests(lines)
+    local numStatus, numEntries = call(fn("C_QuestLog.GetNumQuestLogEntries"))
+    if numStatus == "ok" then
+        for i = 1, math.min(tonumber(numEntries) or 0, 50) do
+            local _, info = call(fn("C_QuestLog.GetInfo"), i)
+            if type(info) == "table" and not info.isHeader and info.questID then
+                local tagStatus, tag = call(fn("C_QuestLog.GetQuestTagInfo"), info.questID)
+                lines[#lines + 1] = string.format('S4 quest %s %s: level=%s suggestedGroup=%s frequency=%s'
+                    .. ' isComplete=%s tag=%s', tostring(info.questID), format(info.title, 0), tostring(info.level),
+                    tostring(info.suggestedGroup), tostring(info.frequency), tostring(info.isComplete),
+                    tagStatus == "ok" and format(tag, 0) or tagStatus)
+            end
+        end
+    end
+    local flagged = fn("C_QuestLog.IsQuestFlaggedCompleted")
+    if type(flagged) ~= "function" then
+        lines[#lines + 1] = "S4 dungeon quest flags (IsQuestFlaggedCompleted): missing"
+    else
+        local groups = {}
+        for _, d in ipairs(DUNGEON_QUESTS) do
+            local parts = { d[1] }
+            for _, id in ipairs(d[2]) do
+                local st, done = call(flagged, id)
+                parts[#parts + 1] = id .. "=" .. (st ~= "ok" and st or (done and "yes" or "no"))
+            end
+            groups[#groups + 1] = table.concat(parts, " ")
+        end
+        lines[#lines + 1] = "S4 dungeon quest flags (IsQuestFlaggedCompleted): " .. table.concat(groups, " | ")
+    end
+    local _, saved = call(fn("GetNumSavedInstances"))
+    for i = 1, math.min(tonumber(saved) or 0, 5) do simple(lines, { { "GetSavedInstanceInfo", i } }) end
+end
+
+local function spellName(configId, entryId)
+    if not entryId then return "?" end
+    local defId = field(fn("C_Traits.GetEntryInfo"), "definitionID", configId, entryId)
+    local spellId = defId ~= nil and field(fn("C_Traits.GetDefinitionInfo"), "spellID", defId) or nil
+    if spellId == nil then return "?" end
+    local nameFn = fn("C_Spell.GetSpellName") or fn("GetSpellInfo")
+    local st, name = call(nameFn, spellId)
+    return st == "ok" and format(name, 0) or st
+end
+
+local function s4Talents(lines)
+    local _, configId = call(fn("C_ClassTalents.GetActiveConfigID"))
+    local _, config = call(fn("C_Traits.GetConfigInfo"), configId)
+    local grid = {}
+    for _, treeId in ipairs(type(config) == "table" and config.treeIDs or {}) do
+        local _, treeNodes = call(fn("C_Traits.GetTreeNodes"), treeId)
+        for _, nodeId in ipairs(type(treeNodes) == "table" and treeNodes or {}) do
+            local _, info = call(fn("C_Traits.GetNodeInfo"), configId, nodeId)
+            info = type(info) == "table" and info or {}
+            grid[#grid + 1] = { nodeId = nodeId, posX = info.posX, posY = info.posY, info = info }
+        end
+    end
+    ns.TalentGrid.Assign(grid)
+    table.sort(grid, function(a, b)
+        local ka = (a.tree or 9) * 10000 + (a.row or 99) * 100 + (a.col or 99)
+        local kb = (b.tree or 9) * 10000 + (b.row or 99) * 100 + (b.col or 99)
+        if ka ~= kb then return ka < kb end
+        return tostring(a.nodeId) < tostring(b.nodeId)
+    end)
+    for _, n in ipairs(grid) do
+        local i = n.info
+        local where = n.tree and string.format("t%d r%d c%d", n.tree, n.row, n.col) or "unplaced"
+        lines[#lines + 1] = string.format("S4 talent %s: %s rank %s/%s (node %s)", where,
+            spellName(configId, type(i.entryIDs) == "table" and i.entryIDs[1] or nil),
+            tostring(i.activeRank or i.ranksPurchased or 0), tostring(i.maxRanks or "?"), tostring(n.nodeId))
+    end
+end
+
+local DISCOVER = { "legacy", "forever", "challenge" }
+
+local function s4Discover(lines)
+    -- Names only: nothing found here is called.
+    local found, namespaces = {}, {}
+    for key, value in pairs(_G) do
+        if type(key) == "string" then
+            local lower = key:lower()
+            for _, word in ipairs(DISCOVER) do
+                if lower:find(word, 1, true) then
+                    found[#found + 1] = key .. "(" .. type(value) .. ")"
+                    if type(value) == "table" and key:match("^C_") then namespaces[#namespaces + 1] = key end
+                    break
+                end
+            end
+        end
+    end
+    table.sort(found)
+    if #found > 80 then found[81] = "... " .. (#found - 80) .. " more"; for k = #found, 82, -1 do found[k] = nil end end
+    lines[#lines + 1] = "S4 globals matching legacy|forever|challenge: " .. table.concat(found, ", ")
+    table.sort(namespaces)
+    for _, name in ipairs(namespaces) do
+        local fns = {}
+        for k, v in pairs(_G[name]) do
+            if type(v) == "function" then fns[#fns + 1] = tostring(k) end
+        end
+        table.sort(fns)
+        lines[#lines + 1] = string.format("S4 %s functions: %s", name, table.concat(fns, ", "))
+    end
+
+    -- Extra talent systems (professions / skyriding live in their own C_Traits
+    -- systems on the modern client; legacy talents may too).
+    local bySystem = fn("C_Traits.GetConfigIDBySystemID")
+    if type(bySystem) ~= "function" then
+        lines[#lines + 1] = "S4 trait systems: C_Traits.GetConfigIDBySystemID missing"
+    else
+        local any = false
+        for systemId = 1, 300 do
+            local _, configId = call(bySystem, systemId)
+            if type(configId) == "number" and configId > 0 then
+                any = true
+                local _, info = call(fn("C_Traits.GetConfigInfo"), configId)
+                local trees = {}
+                for _, treeId in ipairs(type(info) == "table" and type(info.treeIDs) == "table" and info.treeIDs or {}) do
+                    local _, nodes = call(fn("C_Traits.GetTreeNodes"), treeId)
+                    local currency = { call(fn("C_Traits.GetTreeCurrencyInfo"), configId, treeId, false) }
+                    trees[#trees + 1] = string.format("%s (%d nodes%s)", tostring(treeId),
+                        type(nodes) == "table" and #nodes or 0,
+                        currency[1] == "ok" and (", currency " .. format(currency[2], 0)) or "")
+                end
+                lines[#lines + 1] = string.format("S4 trait system %d: config %d %s trees %s", systemId, configId,
+                    format(info, 1), table.concat(trees, ", "))
+            end
+        end
+        if not any then lines[#lines + 1] = "S4 trait systems: none of 1-300 has a config" end
+    end
+
+    -- Achievements ("legacy challenges" are achievement-like).
+    simple(lines, { { "GetTotalAchievementPoints" }, { "GetNumCompletedAchievements" } })
+    local catStatus, cats = call(fn("GetCategoryList"))
+    if catStatus ~= "ok" or type(cats) ~= "table" then
+        lines[#lines + 1] = "S4 achievement categories: GetCategoryList " .. (catStatus == "ok" and "nil" or catStatus)
+        return
+    end
+    local listed, detail = {}, {}
+    for k, id in ipairs(cats) do
+        local _, name = call(fn("GetCategoryInfo"), id)
+        if k <= 150 then listed[#listed + 1] = tostring(id) .. " " .. format(name, 0) end
+        local lower = type(name) == "string" and name:lower() or ""
+        for _, word in ipairs(DISCOVER) do
+            if lower:find(word, 1, true) then detail[#detail + 1] = { id = id, name = name } break end
+        end
+    end
+    lines[#lines + 1] = "S4 achievement categories: " .. table.concat(listed, ", ")
+    for _, c in ipairs(detail) do
+        local counts = { call(fn("GetCategoryNumAchievements"), c.id) }
+        lines[#lines + 1] = string.format("S4 achievement category %s %s: GetCategoryNumAchievements = %s",
+            tostring(c.id), format(c.name, 0), counts[1] == "ok"
+                and formatResults({ unpack(counts, 2, table.maxn(counts)) }, table.maxn(counts) - 1) or counts[1])
+        for i = 1, math.min(tonumber(counts[2]) or 0, 10) do
+            local st, id, name, points, completed, _, _, _, description = call(fn("GetAchievementInfo"), c.id, i)
+            if st == "ok" and id then
+                lines[#lines + 1] = string.format("S4 achievement %s %s points=%s completed=%s description=%s",
+                    tostring(id), format(name, 0), tostring(points), tostring(completed), format(description, 0))
+            end
+        end
+    end
+end
+
+local function s4Character(lines)
+    simple(lines, { { "GetAverageItemLevel" }, { "UnitXP", "player" }, { "UnitXPMax", "player" },
+        { "GetXPExhaustion" }, { "GetProfessions" }, { "GetNumSkillLines" } })
+    local _, n = call(fn("GetNumSkillLines"))
+    for i = 1, math.min(tonumber(n) or 0, 40) do simple(lines, { { "GetSkillLineInfo", i } }) end
+end
+
+local function s4Lines(lines)
+    s4Group(lines)
+    s4Instance(lines)
+    s4Pulls(lines)
+    s4Quests(lines)
+    s4Talents(lines)
+    s4Discover(lines)
+    s4Character(lines)
+end
+
 local function s3Lines(lines)
     local sStatus, sex = call(UnitSex, "player")
     lines[#lines + 1] = 'S3 UnitSex("player") = ' .. (sStatus == "ok" and format(sex, 0) or sStatus)
@@ -301,6 +551,7 @@ local function s3Lines(lines)
     local completed = s3Quests(lines)
     s3DungeonQuests(lines, completed)
     s3Size(lines, completed)
+    s4Lines(lines)
 end
 
 --- Plain-text report, one line per check.
