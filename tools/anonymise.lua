@@ -95,7 +95,8 @@ local function escapePattern(s) return (s:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%
 
 -- Every string VALUE in the anonymised JSON (keys excluded), checked whole and
 -- word by word (split on spaces and "-"), so "First Surname-Realm" can't hide a
--- surviving part. Reports where, never the personal string itself.
+-- surviving part; realm fields (public) are checked whole only. Reports where,
+-- never the personal string itself.
 local isOriginal = {}
 for _, orig in ipairs(originals) do isOriginal[orig] = true end
 local function assertNoLeak(json, page)
@@ -104,7 +105,12 @@ local function assertNoLeak(json, page)
             for k, child in pairs(v) do check(child, path .. "." .. tostring(k)) end
         elseif type(v) == "string" then
             local leak = isOriginal[v]
-            for word in v:gmatch("[^%s%-]+") do leak = leak or isOriginal[word] end
+            -- Realm names are public and kept on purpose; a member whose name
+            -- shares a word with the realm ("Beta") must not block them.
+            local realm = path:match("%.realmName$") or path:match("%.rawRealm$")
+            if not realm then
+                for word in v:gmatch("[^%s%-]+") do leak = leak or isOriginal[word] end
+            end
             if leak then error(string.format("a personal string survived in page %d at %s", page, path), 0) end
         end
     end
