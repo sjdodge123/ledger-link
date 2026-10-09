@@ -88,10 +88,10 @@ describe("/rl export all", function()
         assert.is_true(printed("/rl export guild"))
     end)
 
-    it("is a panel button too, and never moves keyboard focus", function()
+    it("is the panel's export button, and never moves keyboard focus", function()
         WowStub.focusCalls = 0
         ns.Panel.Show()
-        local b = assert(WowStub.frames.LedgerLinkPanelExportAll)
+        local b = assert(WowStub.frames.LedgerLinkPanelExport)
         b.scripts.OnClick(b, "LeftButton")
         assert.equal("char:1 guild:1 raid:1", sections(ns.ExportFrame.GetText()))
         assert.equal(0, WowStub.focusCalls)

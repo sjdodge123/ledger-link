@@ -1,4 +1,4 @@
--- The Ledger Link panel (/rl, or the minimap button): export buttons, ruleset,
+-- The Ledger Link panel (/rl, or the minimap button): one export button, ruleset,
 -- the beta-only region picker, public guild notes, recorded pulls, beta probe.
 -- Every control calls the same functions as the slash commands.
 local _, ns = ...
@@ -26,32 +26,22 @@ local function clientRegionKnown()
 end
 
 local function create()
-    local f = ns.UI.Window("LedgerLinkPanel", 320, 358)
+    local f = ns.UI.Window("LedgerLinkPanel", 320, 322)
     title = ns.UI.Label(f, nil, "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -18)
 
+    -- One export button (operator 2026-10-09): the one-paste export of char,
+    -- guild and raid. The per-section exports stay as /rl export char|guild|raid.
     local y = -48
-    local exportLabel = ns.UI.Label(f, "Export to Raid Ledger")
-    exportLabel:SetPoint("TOPLEFT", 24, y)
-    y = y - 20
-    local x = 24
-    for _, e in ipairs({ { "char", "Character" }, { "guild", "Guild" }, { "raid", "Raid" } }) do
-        local section = e[1]
-        local b = ns.UI.Button(f, e[2], 88, function()
-            ns.lastCommand = "panel: export " .. section
-            ns.RunExport(section)
-        end, "LedgerLinkPanelExport" .. section:gsub("^%l", string.upper))
-        b:SetPoint("TOPLEFT", x, y)
-        x = x + 92
-    end
-    y = y - 26
-    local all = ns.UI.Button(f, "Export all (one paste)", 272, function()
-        ns.lastCommand = "panel: export all"
+    local export = ns.UI.Button(f, "Export to Raid Ledger", 272, function()
+        ns.lastCommand = "panel: export"
         ns.RunExport("all")
-    end, "LedgerLinkPanelExportAll")
-    all:SetPoint("TOPLEFT", 24, y)
+    end, "LedgerLinkPanelExport")
+    export:SetHeight(30)
+    export:SetPoint("TOPLEFT", 24, y)
 
-    y = y - 34
+    local x
+    y = y - 44
     rulesetLabel = ns.UI.Label(f)
     rulesetLabel:SetPoint("TOPLEFT", 24, y)
     y = y - 20

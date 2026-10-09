@@ -5,12 +5,11 @@
 <h2>How to use it</h2>
 <ol>
 <li>Click the <strong>Ledger Link minimap button</strong> (or type <code>/rl</code>) to open the panel.</li>
-<li>Pick your realm's ruleset once on each character: <strong>Normal</strong>, <strong>PvP</strong>, <strong>RP</strong> or <strong>Hardcore</strong>.</li>
-<li>Click <strong>Export all (one paste)</strong>. A box opens with your character, guild and raid strings.</li>
+<li>Check your ruleset: pick <strong>Normal</strong>, <strong>PvP</strong>, <strong>RP</strong> or <strong>Hardcore</strong> once on each character (Hardcore is detected automatically).</li>
+<li>Click <strong>Export to Raid Ledger</strong>. A box opens with your character, guild and raid data in one go.</li>
 <li><strong>Click the text</strong> to select all of it, then press <strong>Ctrl+C</strong>.</li>
 <li>In Raid Ledger, open your character, choose <strong>Import string</strong>, and paste.</li>
 </ol>
-<p>You can also export each part on its own with the <strong>Character</strong>, <strong>Guild</strong> and <strong>Raid</strong> buttons.</p>
 
 <h2>What it exports</h2>
 <ul>
@@ -18,19 +17,20 @@
 <li><strong>Guild:</strong> your guild roster, up to 2,000 members, with names, ranks, levels, classes and when each member was last online.</li>
 <li><strong>Raid:</strong> your last 50 boss pulls. While the addon is loaded, it records each pull by itself: the encounter, difficulty, kill or wipe, start and end times, and who was in your group. It doesn't record damage or DPS, because WoW: Forever doesn't let addons read the combat log.</li>
 </ul>
-<p>A guild with more than 250 members exports in pages. <strong>Export all</strong> puts every page in the same box. If you export the guild on its own, use <strong>Next &gt;</strong> to step through the pages, copy each one, and paste them all into the same import box, in any order.</p>
+<p>Not in a guild, or no boss pulls recorded yet? That part is simply left out. A big guild (more than 250 members) is split into several lines in the same box; paste them all at once.</p>
 
 <h2>Commands</h2>
+<p>You don't need any: the panel covers everything. These are there if you prefer typing.</p>
 <table>
 <thead><tr><th>Command</th><th>What it does</th></tr></thead>
 <tbody>
 <tr><td><code>/rl</code></td><td>Opens the Ledger Link panel</td></tr>
-<tr><td><code>/rl export all</code></td><td>Character, guild and raid in one box, pasted into Raid Ledger together</td></tr>
-<tr><td><code>/rl export char</code> | <code>guild</code> | <code>raid</code></td><td>Exports one part on its own</td></tr>
+<tr><td><code>/rl export all</code></td><td>Same as the panel's Export to Raid Ledger button</td></tr>
+<tr><td><code>/rl export char</code> | <code>guild</code> | <code>raid</code></td><td>Optional: exports one part on its own</td></tr>
 <tr><td><code>/rl ruleset normal | pvp | rp | hardcore</code></td><td>Sets this character's realm ruleset</td></tr>
 <tr><td><code>/rl guildnotes on | off</code></td><td>Adds public guild notes to the guild export (off by default)</td></tr>
 <tr><td><code>/rl raid</code> / <code>/rl raid clear</code></td><td>Shows or clears your recorded boss pulls</td></tr>
-<tr><td><code>/rl region us | eu | kr | tw</code></td><td>Your region, only needed if the game doesn't report it (the panel shows these buttons when that happens)</td></tr>
+<tr><td><code>/rl region us | eu | kr | tw</code></td><td>Corrects your region, only if the game doesn't report it (the addon guesses it from your game language otherwise)</td></tr>
 <tr><td><code>/rl minimap on | off</code></td><td>Shows or hides the minimap button</td></tr>
 <tr><td><code>/rl status</code></td><td>Shows your last export times</td></tr>
 <tr><td><code>/rl probe</code></td><td>A diagnostic report to include in bug reports</td></tr>

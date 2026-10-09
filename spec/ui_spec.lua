@@ -37,15 +37,26 @@ describe("panel", function()
         ns.Panel.Show()
     end)
 
-    it("exports from its buttons", function()
-        click("LedgerLinkPanelExportChar")
-        assert.is_true(WowStub.frames.LedgerLinkExportFrame.shown)
-        assert.truthy(ns.ExportFrame.GetText():match("^!RL1!char!"))
+    -- Operator 2026-10-09: one export button in the panel (the "Export all"
+    -- paste); the per-section exports stay as optional slash commands.
+    it("has a single export button that makes the one-paste export", function()
         WowStub.raid(5)
         ns.Raid.OnEvent("ENCOUNTER_START", 663, "Lucifron", 9, 40)
         ns.Raid.OnEvent("ENCOUNTER_END", 663, "Lucifron", 9, 40, 1)
-        click("LedgerLinkPanelExportRaid")
-        assert.truthy(ns.ExportFrame.GetText():match("^!RL1!raid!"))
+        click("LedgerLinkPanelExport")
+        assert.is_true(WowStub.frames.LedgerLinkExportFrame.shown)
+        local lines = {}
+        for line in ns.ExportFrame.GetText():gmatch("[^\n]+") do lines[#lines + 1] = line:match("^!RL1!(%a+)") end
+        assert.same({ "char", "guild", "raid" }, lines)
+        for _, gone in ipairs({ "LedgerLinkPanelExportChar", "LedgerLinkPanelExportGuild",
+            "LedgerLinkPanelExportRaid", "LedgerLinkPanelExportAll" }) do
+            assert.is_nil(WowStub.frames[gone], gone .. " should not exist")
+        end
+    end)
+
+    it("leaves the per-section exports to slash commands", function()
+        ns.HandleSlash("export char")
+        assert.truthy(ns.ExportFrame.GetText():match("^!RL1!char!"))
     end)
 
     it("sets the ruleset and highlights the chosen one", function()
@@ -106,7 +117,7 @@ describe("panel", function()
         WowStub.raid(5)
         ns.Raid.OnEvent("ENCOUNTER_START", 663, "Lucifron", 9, 40)
         ns.Raid.OnEvent("ENCOUNTER_END", 663, "Lucifron", 9, 40, 1)
-        for _, name in ipairs({ "LedgerLinkPanelExportChar", "LedgerLinkPanelExportGuild", "LedgerLinkPanelExportRaid",
+        for _, name in ipairs({ "LedgerLinkPanelExport",
             "LedgerLinkPanelRulesetpvp", "LedgerLinkPanelRegionus", "LedgerLinkPanelGuildNotes",
             "LedgerLinkPanelClearPulls", "LedgerLinkPanelProbe" }) do
             click(name)
@@ -120,7 +131,7 @@ describe("panel", function()
     -- and with the translucent dialog background the two were hard to tell
     -- apart. The panel steps aside, and both windows are near-opaque.
     it("closes when it opens an export or the probe, so only one window is up", function()
-        click("LedgerLinkPanelExportChar")
+        click("LedgerLinkPanelExport")
         assert.is_false(ns.Panel.IsShown())
         assert.is_true(WowStub.frames.LedgerLinkExportFrame.shown)
         ns.Panel.Show()
@@ -130,12 +141,12 @@ describe("panel", function()
 
     it("stays open when an export can't run, so the player sees why", function()
         WowStub.state.inCombat = true
-        click("LedgerLinkPanelExportChar")
+        click("LedgerLinkPanelExport")
         assert.is_true(ns.Panel.IsShown())
     end)
 
     it("panel and export window have a near-opaque background", function()
-        click("LedgerLinkPanelExportChar")
+        click("LedgerLinkPanelExport")
         for _, name in ipairs({ "LedgerLinkPanel", "LedgerLinkExportFrame" }) do
             local color = WowStub.frames[name].backdropColor
             assert(color, name .. " has no backdrop colour")

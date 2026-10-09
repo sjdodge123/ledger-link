@@ -40,15 +40,16 @@ GUIDs + names). The newest **50** pulls are kept in `LedgerLinkDB.raid.pulls`
 combat log (`COMBAT_LOG_EVENT_UNFILTERED`) is closed to addons on Forever, so
 Details!/DBM-style log parsing is impossible in-game.
 
-**Export all.** `/rl export all` (or the panel's **Export all** button) shows
+**Export all.** The panel's **Export to Raid Ledger** button (or `/rl export all`) shows
 the character string, every guild page and the raid string in one box, one per
 line, to paste into Raid Ledger in one go (Raid Ledger ROK-1737, CONTRACT.md
 §5.1). Each string keeps its normal format. No guild or no recorded pulls?
 That section is left out and the chat says so. A paste over Raid Ledger's
 256 KB limit is refused with a hint to export the guild on its own.
 
-**Panel.** `/rl` or the minimap button opens a small window with the export
-buttons (including Export all), ruleset buttons, the public-guild-notes checkbox, the recorded
+**Panel.** `/rl` or the minimap button opens a small window with one
+**Export to Raid Ledger** button (the Export all paste; the per-section exports
+stay as optional `/rl export char|guild|raid`), ruleset buttons, the public-guild-notes checkbox, the recorded
 pull count (with Clear), a Beta probe button, and, only when the game doesn't
 report a region (the beta), region buttons. Every control does exactly what the
 matching slash command does. Drag the minimap button around the minimap edge;
