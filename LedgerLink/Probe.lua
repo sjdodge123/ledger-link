@@ -106,6 +106,165 @@ local function describeCall(spec)
     return label .. " = " .. formatResults(values, n)
 end
 
+-- Raid Ledger request 2026-10-09 (planning-artifacts/LEDGERLINK-S3-REQUEST):
+-- gender, talent names/positions, completed quests, quest log, and the size a
+-- completed-quest list would add. Lines start with "S3". Read-only; each call
+-- is pcall-wrapped and reported as missing / error: <text> / its value.
+
+local function call(fn, ...)
+    if type(fn) ~= "function" then return "missing" end
+    local results = { pcall(fn, ...) }
+    if not results[1] then return "error", tostring(results[2]) end
+    return "ok", unpack(results, 2, table.maxn(results))
+end
+
+local function list(t)
+    if type(t) ~= "table" then return format(t, 0) end
+    local out = {}
+    for i, v in ipairs(t) do out[i] = format(v, 1) end
+    return "{" .. table.concat(out, ", ") .. "}"
+end
+
+local function field(fn, key, ...)
+    local status, value = call(fn, ...)
+    if status ~= "ok" then return nil, status == "missing" and "missing" or ("error: " .. tostring(value)) end
+    if type(value) ~= "table" then return nil, "nil" end
+    return value[key], tostring(value[key])
+end
+
+local function s3Talents(lines)
+    local traits = C_Traits
+    if type(traits) ~= "table" then
+        lines[#lines + 1] = "S3 talents: C_Traits missing"
+        return
+    end
+    local _, configId = call(C_ClassTalents and C_ClassTalents.GetActiveConfigID)
+    local status, config = call(traits.GetConfigInfo, configId)
+    if status ~= "ok" or type(config) ~= "table" then
+        lines[#lines + 1] = "S3 talents: GetConfigInfo(" .. tostring(configId) .. ") = " .. tostring(status)
+        return
+    end
+    local trees, nodes = config.treeIDs or {}, {}
+    for _, treeId in ipairs(trees) do
+        local _, treeNodes = call(traits.GetTreeNodes, treeId)
+        for _, nodeId in ipairs(type(treeNodes) == "table" and treeNodes or {}) do
+            local _, info = call(traits.GetNodeInfo, configId, nodeId)
+            nodes[#nodes + 1] = { id = nodeId, info = type(info) == "table" and info or {} }
+        end
+    end
+    local ranked, xs, ys = 0, {}, {}
+    local minX, maxX, minY, maxY
+    for _, n in ipairs(nodes) do
+        local i = n.info
+        if (tonumber(i.activeRank) or 0) > 0 or (tonumber(i.ranksPurchased) or 0) > 0 then ranked = ranked + 1 end
+        if type(i.posX) == "number" then
+            xs[i.posX] = true
+            minX, maxX = math.min(minX or i.posX, i.posX), math.max(maxX or i.posX, i.posX)
+        end
+        if type(i.posY) == "number" then
+            ys[i.posY] = true
+            minY, maxY = math.min(minY or i.posY, i.posY), math.max(maxY or i.posY, i.posY)
+        end
+    end
+    local function distinct(t) local c = 0 for _ in pairs(t) do c = c + 1 end return c end
+    lines[#lines + 1] = string.format("S3 talents: config %s, trees %s, nodes %d (with rank %d); "
+        .. "posX %s..%s (%d distinct), posY %s..%s (%d distinct)",
+        tostring(configId), table.concat(trees, ","), #nodes, ranked,
+        tostring(minX), tostring(maxX), distinct(xs), tostring(minY), tostring(maxY), distinct(ys))
+    -- Sample up to 3 nodes that have entries (those can resolve to a spell).
+    local samples = {}
+    for _, n in ipairs(nodes) do
+        if #samples < 3 and type(n.info.entryIDs) == "table" and n.info.entryIDs[1] then samples[#samples + 1] = n end
+    end
+    if #samples == 0 then
+        lines[#lines + 1] = "S3 talent nodes: none have entryIDs"
+    end
+    for _, n in ipairs(samples) do
+        local i = n.info
+        local defId, defText = field(traits.GetEntryInfo, "definitionID", configId, i.entryIDs[1])
+        local spellId, spellText = nil, "none (no definitionID)"
+        if defId ~= nil then spellId, spellText = field(traits.GetDefinitionInfo, "spellID", defId) end
+        local nameText = "none (no spellID)"
+        if spellId ~= nil then
+            local nameFn = (type(C_Spell) == "table" and C_Spell.GetSpellName) or GetSpellInfo
+            local nameStatus, name = call(nameFn, spellId)
+            nameText = nameStatus == "ok" and format(name, 0) or nameStatus
+        end
+        lines[#lines + 1] = string.format("S3 talent node %s: posX=%s posY=%s activeRank=%s entryIDs=%s"
+            .. " -> definitionID=%s -> spellID=%s -> name %s",
+            tostring(n.id), tostring(i.posX), tostring(i.posY), tostring(i.activeRank), list(i.entryIDs),
+            defText, spellText, nameText)
+    end
+end
+
+local function s3Quests(lines)
+    local log = type(C_QuestLog) == "table" and C_QuestLog or {}
+    local status, ids = call(log.GetAllCompletedQuestIDs)
+    local completed
+    if status == "missing" then
+        lines[#lines + 1] = "S3 completed quests: C_QuestLog.GetAllCompletedQuestIDs missing"
+    elseif status == "error" then
+        lines[#lines + 1] = "S3 completed quests: error: " .. tostring(ids)
+    elseif type(ids) ~= "table" then
+        lines[#lines + 1] = "S3 completed quests: returned " .. format(ids, 0)
+    else
+        completed = ids
+        local first = {}
+        for k = 1, math.min(5, #ids) do first[k] = tostring(ids[k]) end
+        lines[#lines + 1] = string.format("S3 completed quests: %d (first: %s)", #ids, table.concat(first, ", "))
+    end
+
+    local nStatus, numEntries, numQuests = call(log.GetNumQuestLogEntries)
+    if nStatus ~= "ok" then
+        lines[#lines + 1] = "S3 quest log: C_QuestLog.GetNumQuestLogEntries " .. nStatus
+    else
+        lines[#lines + 1] = "S3 quest log: GetNumQuestLogEntries() = " .. tostring(numEntries) .. ", " .. tostring(numQuests)
+        for i = 1, math.min(tonumber(numEntries) or 0, 8) do
+            local iStatus, info = call(log.GetInfo, i)
+            if iStatus ~= "ok" or type(info) ~= "table" then
+                lines[#lines + 1] = string.format("S3 quest log [%d] GetInfo = %s", i, iStatus == "ok" and "nil" or iStatus)
+            elseif info.isHeader then
+                lines[#lines + 1] = string.format("S3 quest log [%d] header %s", i, format(info.title, 0))
+            else
+                local oStatus, objectives = call(log.GetQuestObjectives, info.questID)
+                local objText = oStatus ~= "ok" and oStatus or {}
+                if type(objText) == "table" then
+                    for k, o in ipairs(type(objectives) == "table" and objectives or {}) do objText[k] = format(o, 0) end
+                    objText = table.concat(objText, ", ")
+                end
+                lines[#lines + 1] = string.format("S3 quest log [%d] questID=%s %s objectives: %s",
+                    i, tostring(info.questID), format(info.title, 0), objText)
+            end
+        end
+    end
+    return completed
+end
+
+local function s3Size(lines, completed)
+    local pages, err = ns.Export.RunPages("char")
+    if not pages then
+        lines[#lines + 1] = "S3 size: char export failed: " .. tostring(err)
+        return
+    end
+    local line = string.format("S3 size: char token now %d bytes", #pages[1])
+    if completed then
+        local parts = {}
+        for i, id in ipairs(completed) do parts[i] = tostring(id) end
+        local json = '"quests":{"completed":[' .. table.concat(parts, ",") .. "]}"
+        line = line .. string.format("; %d completed quest ids would add about %s bytes encoded (%d bytes of JSON)",
+            #completed, tostring(ns.Export.EncodedSize(json) or "?"), #json)
+    end
+    lines[#lines + 1] = line
+end
+
+local function s3Lines(lines)
+    local sStatus, sex = call(UnitSex, "player")
+    lines[#lines + 1] = 'S3 UnitSex("player") = ' .. (sStatus == "ok" and format(sex, 0) or sStatus)
+    s3Talents(lines)
+    local completed = s3Quests(lines)
+    s3Size(lines, completed)
+end
+
 --- Plain-text report, one line per check.
 function Probe.Report()
     local lines = {
@@ -120,6 +279,7 @@ function Probe.Report()
         local v = resolve(path)
         lines[#lines + 1] = path .. " = " .. (v == nil and "missing" or type(v))
     end
+    s3Lines(lines)
     return table.concat(lines, "\n")
 end
 
