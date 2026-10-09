@@ -68,6 +68,13 @@ describe("/rl probe: Raid Ledger S3 request", function()
         has(report(ns), "S3 completed quests: 250 (first: 101, 102, 103, 104, 105)")
     end)
 
+    -- Raid Ledger ROK-1748: do vanilla dungeon quests keep their Classic ids?
+    it("checks a watch list of Classic dungeon quest ids against the completed list", function()
+        _G.C_QuestLog.GetAllCompletedQuestIDs = function() return { 456, 141, 2039, 92460 } end
+        has(report(ns), "S3 dungeon quest ids: Ragefire Chasm 5728=no 5761=no | Deadmines 141=yes 166=no"
+            .. " | Wailing Caverns 2040=no 2039=yes | Stockade 1053=no")
+    end)
+
     it("reports the quest log with titles and objectives", function()
         local text = report(ns)
         has(text, "S3 quest log: GetNumQuestLogEntries() = 3, 2")
@@ -89,6 +96,7 @@ describe("/rl probe: Raid Ledger S3 request", function()
         local text = report(ns)
         has(text, 'S3 UnitSex("player") = missing')
         has(text, "S3 completed quests: C_QuestLog.GetAllCompletedQuestIDs missing")
+        has(text, "S3 dungeon quest ids: unavailable (no completed-quest list)")
         has(text, "S3 quest log: C_QuestLog.GetNumQuestLogEntries missing")
         has(text, "-> definitionID=missing")
     end)

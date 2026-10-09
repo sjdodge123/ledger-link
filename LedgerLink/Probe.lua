@@ -251,6 +251,32 @@ local function s3Quests(lines)
     return completed
 end
 
+-- Raid Ledger ROK-1748: do vanilla dungeon quests keep their Classic ids on
+-- Forever? Classic ids for a few dungeon quests, checked against the
+-- completed list (yes / no). Run after doing one of these dungeons.
+local DUNGEON_QUESTS = {
+    { "Ragefire Chasm", { 5728, 5761 } },
+    { "Deadmines", { 141, 166 } },
+    { "Wailing Caverns", { 2040, 2039 } },
+    { "Stockade", { 1053 } },
+}
+
+local function s3DungeonQuests(lines, completed)
+    if not completed then
+        lines[#lines + 1] = "S3 dungeon quest ids: unavailable (no completed-quest list)"
+        return
+    end
+    local done = {}
+    for _, id in ipairs(completed) do done[id] = true end
+    local groups = {}
+    for _, d in ipairs(DUNGEON_QUESTS) do
+        local parts = { d[1] }
+        for _, id in ipairs(d[2]) do parts[#parts + 1] = id .. "=" .. (done[id] and "yes" or "no") end
+        groups[#groups + 1] = table.concat(parts, " ")
+    end
+    lines[#lines + 1] = "S3 dungeon quest ids: " .. table.concat(groups, " | ")
+end
+
 local function s3Size(lines, completed)
     local pages, err = ns.Export.RunPages("char")
     if not pages then
@@ -273,6 +299,7 @@ local function s3Lines(lines)
     lines[#lines + 1] = 'S3 UnitSex("player") = ' .. (sStatus == "ok" and format(sex, 0) or sStatus)
     s3Talents(lines)
     local completed = s3Quests(lines)
+    s3DungeonQuests(lines, completed)
     s3Size(lines, completed)
 end
 
