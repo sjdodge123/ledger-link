@@ -37,7 +37,7 @@ const decodeImportPaste = (decoder as any).decodeImportPaste;
 let failed = 0;
 const seen = new Map<string, { sha256: string; guids: string }>();
 for (const file of readdirSync('$TMP').filter((f) => f.endsWith('.txt')).sort()) {
-  if (file.startsWith('all-')) {
+  if (/(^|-)all-/.test(file)) { // Export all pastes, incl. beta-all-* fixtures
     if (!decodeImportPaste) { console.log('SKIP', file, '(needs Raid Ledger with ROK-1737)'); continue; }
     try {
       const r = decodeImportPaste(readFileSync('$TMP/' + file, 'utf8'));
