@@ -58,6 +58,12 @@ describe("/rl probe: Raid Ledger S3 request", function()
             .. ' -> definitionID=5001 -> spellID=12001 -> name "Mortal Strike"')
     end)
 
+    it("lists every distinct posX / posY value with its node count (row/column mapping)", function()
+        local text = report(ns)
+        has(text, "S3 talent posX values: 100(1), 200(1), 300(1)")
+        has(text, "S3 talent posY values: 100(2), 200(1)")
+    end)
+
     it("reports the completed-quest count with the first ids", function()
         has(report(ns), "S3 completed quests: 250 (first: 101, 102, 103, 104, 105)")
     end)

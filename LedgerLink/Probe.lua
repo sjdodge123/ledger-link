@@ -158,11 +158,11 @@ local function s3Talents(lines)
         local i = n.info
         if (tonumber(i.activeRank) or 0) > 0 or (tonumber(i.ranksPurchased) or 0) > 0 then ranked = ranked + 1 end
         if type(i.posX) == "number" then
-            xs[i.posX] = true
+            xs[i.posX] = (xs[i.posX] or 0) + 1
             minX, maxX = math.min(minX or i.posX, i.posX), math.max(maxX or i.posX, i.posX)
         end
         if type(i.posY) == "number" then
-            ys[i.posY] = true
+            ys[i.posY] = (ys[i.posY] or 0) + 1
             minY, maxY = math.min(minY or i.posY, i.posY), math.max(maxY or i.posY, i.posY)
         end
     end
@@ -171,6 +171,17 @@ local function s3Talents(lines)
         .. "posX %s..%s (%d distinct), posY %s..%s (%d distinct)",
         tostring(configId), table.concat(trees, ","), #nodes, ranked,
         tostring(minX), tostring(maxX), distinct(xs), tostring(minY), tostring(maxY), distinct(ys))
+    -- Every distinct position with its node count: enough to map posX/posY to
+    -- sub-tree, column and row.
+    local function values(t)
+        local keys = {}
+        for k in pairs(t) do keys[#keys + 1] = k end
+        table.sort(keys)
+        for k, v in ipairs(keys) do keys[k] = string.format("%s(%d)", tostring(v), t[v]) end
+        return table.concat(keys, ", ")
+    end
+    lines[#lines + 1] = "S3 talent posX values: " .. values(xs)
+    lines[#lines + 1] = "S3 talent posY values: " .. values(ys)
     -- Sample up to 3 nodes that have entries (those can resolve to a spell).
     local samples = {}
     for _, n in ipairs(nodes) do
