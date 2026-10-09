@@ -22,15 +22,33 @@ Read-only probes; nothing new is exported.
 | 4c | `C_QuestLog.GetQuestObjectives(questID)` | yes | yes | `{ text = "2/3 Nightsaber Fang", finished = false, numFulfilled = 2, numRequired = 3, objectiveType = 1, type = "item" }`; types seen: `item`, `monster`, `log`; quest 98391 has **no** objectives (empty) |
 | 5 | Anything that threw or returned nil | - | - | **none** |
 
-## Talent tree shape
+## Talent tree shape (confirmed 2026-10-09, v1.1.2 probe)
 
-One `C_Traits` tree per class (1117 for Warrior), 52 nodes. Positions:
-`posX` 1020–10880 with **12 distinct** values; `posY` 2130–5730 with **7 distinct**
-values. The three sampled Fury talents (Improved Intercept, Death Wish, Flurry) are
-in that same tree. Hypothesis: the vanilla-style 51-point layout, three sub-trees of 4
-columns side by side (12 columns), 7 tiers (rows). **Not yet confirmed**: the next
-probe lists the distinct posX/posY values and node counts per column so the
-row/column/sub-tree mapping can be stated exactly.
+One `C_Traits` tree per class (1117 for Warrior), 52 nodes, holding the three
+vanilla-style sub-trees side by side. Distinct positions with node counts:
+
+| Sub-tree | posX columns (nodes) | Nodes |
+|---|---|---|
+| 0 (left) | 1020 (5), 1620 (6), 2220 (5), 2820 (1) | 17 |
+| 1 (middle, Fury: Death Wish, Flurry, Improved Intercept) | 5020 (3), 5620 (7), 6220 (5), 6820 (2) | 17 |
+| 2 (right) | 9080 (5), 9680 (5), 10280 (6), 10880 (2) | 18 |
+
+Rows: posY 2130 (8), 2730 (8), 3330 (9), 3930 (10), 4530 (9), 5130 (5), 5730 (3):
+7 rows, 52 nodes in total.
+
+**Mapping:** columns and rows are 600 apart; the gap between sub-trees is about
+2200. So:
+
+- `tree` = which column group (cluster posX values; a gap > 600 starts a new group),
+  0-2 left to right, which matches the in-game tab order (Arms, Fury, Protection
+  for Warrior);
+- `col` = (posX - the group's first posX) / 600, 0-3;
+- `row` = (posY - 2130) / 600, 0-6.
+
+Caveat: the groups' first columns differ (1020, 5020, **9080**), so `col` must be
+measured from each group's own first column, not one global origin. Only one
+class (Warrior) has been probed; another class confirms the 600 spacing and
+2130 origin hold everywhere.
 
 ## Sizes
 
@@ -53,4 +71,4 @@ In this repo, `spec/fixtures/beta/` (names, GUIDs, guild names and notes replace
 ## Still open
 
 - `GetAllCompletedQuestIDs()` count on a **max-level** character.
-- Exact talent row/column/sub-tree mapping (distinct posX/posY values).
+- The talent mapping on a second class (spacing and row origin).
