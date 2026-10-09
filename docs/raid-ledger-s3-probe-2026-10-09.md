@@ -9,28 +9,54 @@ Read-only probes; nothing new is exported.
 
 | # | API | Exists | Returns data | Sample |
 |---|---|---|---|---|
-| 1 | `UnitSex("player")` | yes | yes | `2` (male) |
+| 1 | `UnitSex("player")` | yes | yes | `2` (male, Warrior); `3` (female, Druid) |
 | 2a | `C_ClassTalents.GetActiveConfigID()` → `C_Traits.GetConfigInfo(configId).treeIDs` | yes | yes | config `12937387`, **one** tree `1117` |
 | 2b | `C_Traits.GetTreeNodes(1117)` | yes | yes | **52** nodes, 1 with a rank at level 8 |
 | 2c | `C_Traits.GetNodeInfo(configId, nodeId)`: `posX`, `posY`, `entryIDs`, `activeRank` | yes | yes | node `105926`: posX `6820`, posY `4530`, entryIDs `{130656}`, activeRank `0` |
 | 2d | `C_Traits.GetEntryInfo(configId, entryId).definitionID` | yes | yes | `130656` → `135457` |
 | 2e | `C_Traits.GetDefinitionInfo(definitionId).spellID` | yes | yes | `135457` → `20504` |
 | 2f | `C_Spell.GetSpellName(spellID)` | yes | yes | `20504` → "Improved Intercept"; `12328` → "Death Wish"; `12319` → "Flurry" |
-| 3 | `C_QuestLog.GetAllCompletedQuestIDs()` | yes | yes | **40** ids at level 8 (first: 456, 457, 458, 459, 475). **Max-level count still to come.** |
+| 3 | `C_QuestLog.GetAllCompletedQuestIDs()` | yes | yes | **40** ids at level 8 (first: 456, 457, 458, 459, 475); a level 6 Druid on Zephras Isle: **16** (first: 92460-92464, Forever-specific ids). **Max-level count still to come.** |
 | 4a | `C_QuestLog.GetNumQuestLogEntries()` | yes | yes | `15, 12` (entries incl. headers, quests) |
 | 4b | `C_QuestLog.GetInfo(i)` | yes | yes | headers (`isHeader`, title "Teldrassil") and quests (`questID` 488, title "Zenn's Bidding") |
 | 4c | `C_QuestLog.GetQuestObjectives(questID)` | yes | yes | `{ text = "2/3 Nightsaber Fang", finished = false, numFulfilled = 2, numRequired = 3, objectiveType = 1, type = "item" }`; types seen: `item`, `monster`, `log`; quest 98391 has **no** objectives (empty) |
 | 5 | Anything that threw or returned nil | - | - | **none** |
 
-## Talent tree shape
+## Talent tree shape (confirmed 2026-10-09, v1.1.2 probe)
 
-One `C_Traits` tree per class (1117 for Warrior), 52 nodes. Positions:
-`posX` 1020–10880 with **12 distinct** values; `posY` 2130–5730 with **7 distinct**
-values. The three sampled Fury talents (Improved Intercept, Death Wish, Flurry) are
-in that same tree. Hypothesis: the vanilla-style 51-point layout, three sub-trees of 4
-columns side by side (12 columns), 7 tiers (rows). **Not yet confirmed**: the next
-probe lists the distinct posX/posY values and node counts per column so the
-row/column/sub-tree mapping can be stated exactly.
+One `C_Traits` tree per class (1117 for Warrior), 52 nodes, holding the three
+vanilla-style sub-trees side by side. Distinct positions with node counts:
+
+| Sub-tree | posX columns (nodes) | Nodes |
+|---|---|---|
+| 0 (left) | 1020 (5), 1620 (6), 2220 (5), 2820 (1) | 17 |
+| 1 (middle, Fury: Death Wish, Flurry, Improved Intercept) | 5020 (3), 5620 (7), 6220 (5), 6820 (2) | 17 |
+| 2 (right) | 9080 (5), 9680 (5), 10280 (6), 10880 (2) | 18 |
+
+Rows: posY 2130 (8), 2730 (8), 3330 (9), 3930 (10), 4530 (9), 5130 (5), 5730 (3):
+7 rows, 52 nodes in total.
+
+**Mapping:** columns and rows are 600 apart; the gap between sub-trees is about
+2200. So:
+
+- `tree` = which column group (cluster posX values; a gap > 600 starts a new group),
+  0-2 left to right, which matches the in-game tab order (Arms, Fury, Protection
+  for Warrior);
+- `col` = (posX - the group's first posX) / 600, 0-3;
+- `row` = (posY - 2130) / 600, 0-6.
+
+Caveat: the groups' first columns differ (1020, 5020, **9080**), so `col` must be
+measured from each group's own first column, not one global origin.
+
+**Second class (Druid, tree 1089, level 6, same build):** the **identical** 12 posX
+values and 7 posY values: 1020(4) 1620(6) 2220(5) 2820(1) | 5020(5) 5620(6)
+6220(5) 6820(4) | 9080(2) 9680(6) 10280(5) 10880(3); rows 2130(6) 2730(11)
+3330(9) 3930(10) 4530(9) 5130(4) 5730(3). Sub-trees hold 16 / 20 / 16 nodes (52).
+The third group holds Restoration (Improved Tranquility, Wild Growth, Living
+Spirit), matching tab order Balance, Feral, Restoration. So the grid coordinates are
+shared across classes, and the rule above holds for both. Two of the sampled
+spells have post-classic ids (Wild Growth 408120, Living Spirit 1309631): don't
+assume classic spell ids.
 
 ## Sizes
 
@@ -53,4 +79,4 @@ In this repo, `spec/fixtures/beta/` (names, GUIDs, guild names and notes replace
 ## Still open
 
 - `GetAllCompletedQuestIDs()` count on a **max-level** character.
-- Exact talent row/column/sub-tree mapping (distinct posX/posY values).
+- (Done: Druid confirms the talent mapping.)
