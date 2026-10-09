@@ -27,6 +27,8 @@ read_globals = {
     "C_EncodingUtil", "Enum",
     -- /rl probe (read-only; each one may be missing on the beta)
     "GetCurrentRegionName", "GetCVar", "GetNormalizedRealmName", "C_GameRules", "C_Seasons",
+    -- /rl probe, Raid Ledger S3 request (read-only, each may be missing)
+    "UnitSex", "C_QuestLog", "C_Spell", "GetSpellInfo",
     -- UI
     "CreateFrame", "UIParent", "UISpecialFrames", "ChatFontNormal",
     "Minimap", "GameTooltip", "GetCursorPosition",

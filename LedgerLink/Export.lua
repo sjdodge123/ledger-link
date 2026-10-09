@@ -87,6 +87,18 @@ function Export.Encode(section, payload, pageSuffix)
     return header .. b64
 end
 
+--- Bytes `text` would take once compressed + base64'd exactly like an export
+--- body (for /rl probe size estimates). nil when the codec is unavailable.
+function Export.EncodedSize(text)
+    local codec = C_EncodingUtil
+    if type(codec) ~= "table" or not codec.CompressString or not codec.EncodeBase64 then return nil end
+    local method, level = compressionArgs()
+    local compressed = ns.SafeCall(codec.CompressString, text, method, level)
+    if type(compressed) ~= "string" then return nil end
+    local b64 = ns.SafeCall(codec.EncodeBase64, compressed)
+    return type(b64) == "string" and #b64 or nil
+end
+
 local function encodePages(section, payload, chunks)
     local pages, total = {}, 0
     for i, chunk in ipairs(chunks) do
