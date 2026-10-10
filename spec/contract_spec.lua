@@ -127,6 +127,42 @@ describe("contract/v1", function()
         end
     end)
 
+    -- CONTRACT §3: tree/row/col hints must equal the posX/posY derivation. Runs
+    -- the addon's TalentGrid over every fixture node set, so a drifted hint on
+    -- either side fails here (the pre-ROK-1758 char-forever-talents-named did).
+    it("has talent hints in every fixture that match TalentGrid's posX/posY derivation", function()
+        local grid = require("spec.support.load_addon")().TalentGrid
+        local checked = 0
+        for _, name in ipairs(fixtures("contract/v1/fixtures")) do
+            local expected = dkjson.decode(readFile(name .. ".json"), 1, dkjson.null)
+            local payloads = {}
+            if expected.sections then
+                for _, sec in ipairs(expected.sections) do payloads[#payloads + 1] = sec.payload end
+            else
+                payloads[1] = expected.payload
+            end
+            for _, p in ipairs(payloads) do
+                local nodes = p.section == "char" and p.data.talents and p.data.talents.nodes or {}
+                local copies, hinted = {}, false
+                for i, n in ipairs(nodes) do
+                    copies[i] = { posX = n.posX, posY = n.posY }
+                    hinted = hinted or n.tree ~= nil
+                end
+                if hinted then
+                    grid.Assign(copies)
+                    for i, n in ipairs(nodes) do
+                        if n.tree ~= nil then
+                            assert.same({ n.tree, n.row, n.col }, { copies[i].tree, copies[i].row, copies[i].col },
+                                string.format("%s node %s", name, tostring(n.nodeId)))
+                            checked = checked + 1
+                        end
+                    end
+                end
+            end
+        end
+        assert.is_true(checked > 0, "no fixture carries talent hints")
+    end)
+
     it("accepts every anonymised real string from the beta (spec/fixtures/beta)", function()
         local names = fixtures("spec/fixtures/beta")
         assert.is_true(#names > 0, "no fixtures in spec/fixtures/beta")
