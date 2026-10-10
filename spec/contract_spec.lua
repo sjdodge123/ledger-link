@@ -163,6 +163,33 @@ describe("contract/v1", function()
         assert.is_true(checked > 0, "no fixture carries talent hints")
     end)
 
+    -- ROK-1760: the server's decoded gear `name` is parsed from the raw link the
+    -- addon sends ("|h[Name]|h"), so each fixture's decoded name must appear
+    -- bracketed in the matching raw link.
+    it("has decoded gear names that come from the raw item links", function()
+        local checked = 0
+        for _, name in ipairs(fixtures("contract/v1/fixtures")) do
+            local expected = dkjson.decode(readFile(name .. ".json"), 1, dkjson.null)
+            local result = importString(readFile(name .. ".txt"))
+            local want = expected.sections or { { section = result.groups[1].section, payload = expected.payload } }
+            for _, sec in ipairs(want) do
+                if sec.section == "char" then
+                    local raw
+                    for _, g in ipairs(result.groups) do if g.section == "char" then raw = g.payloads[1] end end
+                    for i, item in ipairs(sec.payload.data.gear) do
+                        if type(item.name) == "string" then
+                            local link = raw.data.gear[i].link
+                            assert(type(link) == "string" and link:find("[" .. item.name .. "]", 1, true),
+                                string.format("%s gear %d: %q not in link", name, i, item.name))
+                            checked = checked + 1
+                        end
+                    end
+                end
+            end
+        end
+        assert.is_true(checked > 0, "no fixture carries decoded gear names")
+    end)
+
     it("accepts every anonymised real string from the beta (spec/fixtures/beta)", function()
         local names = fixtures("spec/fixtures/beta")
         assert.is_true(#names > 0, "no fixtures in spec/fixtures/beta")
