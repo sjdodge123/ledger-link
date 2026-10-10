@@ -18,6 +18,8 @@ read_globals = {
     "UnitLevel", "UnitFactionGroup", "GetGuildInfo", "InCombatLockdown",
     -- char section
     "GetInventoryItemLink", "GetInventoryItemID", "C_Item", "C_ClassTalents", "C_Traits",
+    -- char section, Phase 2 (ROK-1742): talent names, gender, quests
+    "C_Spell", "GetSpellInfo", "UnitSex", "C_QuestLog",
     "GetNumSavedInstances", "GetSavedInstanceInfo",
     -- guild section
     "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "C_GuildInfo",

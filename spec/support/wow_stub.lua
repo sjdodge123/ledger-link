@@ -98,6 +98,8 @@ function WowStub.reset()
     for i = #printed, 1, -1 do printed[i] = nil end
     _G.LedgerLinkDB, _G.LedgerLinkCharDB = nil, nil
     _G.C_GameRules = nil -- tests that need it set their own
+    _G.UnitSex, _G.C_QuestLog, _G.C_Spell = nil, nil, nil
+    if _G.C_Traits then _G.C_Traits.GetEntryInfo, _G.C_Traits.GetDefinitionInfo = nil, nil end
 end
 WowStub.reset()
 

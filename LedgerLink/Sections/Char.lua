@@ -38,13 +38,47 @@ function Char.Gear()
     return gear
 end
 
+local function round(x) return math.floor(x + 0.5) end
+
+-- entryID -> definitionID -> spellID -> name (Raid Ledger ROK-1742); nil when
+-- any step is missing.
+local function nodeSpell(configId, entryId)
+    local entry = ns.SafeCall(C_Traits.GetEntryInfo, configId, entryId)
+    local defId = type(entry) == "table" and entry.definitionID or nil
+    local def = defId and ns.SafeCall(C_Traits.GetDefinitionInfo, defId) or nil
+    local spellId = type(def) == "table" and ns.AsId(def.spellID) or nil
+    if not spellId or spellId < 1 then return nil end
+    local nameFn = (type(C_Spell) == "table" and C_Spell.GetSpellName) or GetSpellInfo
+    return spellId, ns.Clip(ns.SafeCall(nameFn, spellId), 64)
+end
+
+-- Every node, rank 0 included (Raid Ledger draws the full grid, ROK-1744).
 local function nodeRow(configId, nodeId)
     local info = ns.SafeCall(C_Traits.GetNodeInfo, configId, nodeId)
     if type(info) ~= "table" then return nil end
-    local rank = ns.AsId(info.activeRank or info.ranksPurchased)
-    if not rank or rank < 1 then return nil end
+    local row = { nodeId = ns.AsId(nodeId), rank = ns.AsId(info.activeRank or info.ranksPurchased) or 0 }
+    -- The chosen entry; for an unchosen node only an unambiguous single entry.
     local entry = type(info.activeEntry) == "table" and info.activeEntry.entryID or nil
-    return { nodeId = ns.AsId(nodeId), rank = rank, entryId = ns.AsId(entry) }
+    if not entry and type(info.entryIDs) == "table" and #info.entryIDs == 1 then entry = info.entryIDs[1] end
+    row.entryId = ns.AsId(entry)
+    if row.entryId then row.spellId, row.name = nodeSpell(configId, row.entryId) end
+    local maxRanks = ns.AsId(info.maxRanks)
+    if maxRanks and maxRanks >= 1 and maxRanks <= 255 then row.maxRanks = maxRanks end
+    if type(info.posX) == "number" and type(info.posY) == "number" then
+        row.posX, row.posY = ns.AsId(round(info.posX)), ns.AsId(round(info.posY))
+    end
+    return row
+end
+
+-- tree / row / col hints by the shared rule (TalentGrid, CONTRACT.md §3); a
+-- hint outside the contract's range is dropped, the raw position stays.
+local function addGridHints(nodes)
+    ns.TalentGrid.Assign(nodes)
+    for _, n in ipairs(nodes) do
+        if n.tree and not (n.tree <= 2 and n.row >= 0 and n.row <= 9 and n.col >= 0 and n.col <= 3) then
+            n.tree, n.row, n.col = nil, nil, nil
+        end
+    end
 end
 
 local function talentNodes(configId)
@@ -58,6 +92,7 @@ local function talentNodes(configId)
             if row and #nodes < MAX_TALENT_NODES then nodes[#nodes + 1] = row end
         end
     end
+    addGridHints(nodes)
     return nodes
 end
 
@@ -102,11 +137,63 @@ function Char.Lockouts()
     return lockouts
 end
 
+-- Contract limits (wow-addon-export.schema.ts, ROK-1742).
+Char.QUESTS_COMPLETED_MAX = 10000
+Char.QUESTS_IN_PROGRESS_MAX = 35
+Char.QUEST_OBJECTIVES_MAX = 10
+
+local function objectives(questId)
+    local list = ns.SafeCall(C_QuestLog.GetQuestObjectives, questId)
+    if type(list) ~= "table" or #list == 0 then return nil end
+    local out = Json.array()
+    for k = 1, math.min(#list, Char.QUEST_OBJECTIVES_MAX) do
+        local o = type(list[k]) == "table" and list[k] or {}
+        out[k] = { text = ns.Clip(o.text, 128) or "", done = o.finished == true,
+            have = ns.AsId(o.numFulfilled), need = ns.AsId(o.numRequired) }
+    end
+    return out
+end
+
+--- Completed quest ids (ascending, capped) + the quest log. nil without
+--- C_QuestLog, so the key is simply absent.
+function Char.Quests()
+    if type(C_QuestLog) ~= "table" then return nil end
+    local all = {}
+    for _, id in ipairs(ns.SafeCall(C_QuestLog.GetAllCompletedQuestIDs) or {}) do
+        local v = ns.AsId(id)
+        if v then all[#all + 1] = v end
+    end
+    table.sort(all)
+    local completed = Json.array()
+    for i = 1, math.min(#all, Char.QUESTS_COMPLETED_MAX) do completed[i] = all[i] end
+
+    local inProgress = Json.array()
+    local entries = ns.AsId(ns.SafeCall(C_QuestLog.GetNumQuestLogEntries)) or 0
+    for i = 1, math.min(entries, 200) do
+        if #inProgress >= Char.QUESTS_IN_PROGRESS_MAX then break end
+        local info = ns.SafeCall(C_QuestLog.GetInfo, i)
+        local questId = type(info) == "table" and not info.isHeader and ns.AsId(info.questID) or nil
+        if questId then
+            inProgress[#inProgress + 1] = { questId = questId, title = ns.Clip(info.title, 128),
+                objectives = objectives(questId) }
+        end
+    end
+
+    local quests = { completed = completed, inProgress = inProgress }
+    if #all > Char.QUESTS_COMPLETED_MAX then
+        quests.completedTruncated = true
+        ns.Print(string.format("You have %d completed quests; Raid Ledger keeps %d, so the lowest %d ids were exported.",
+            #all, Char.QUESTS_COMPLETED_MAX, Char.QUESTS_COMPLETED_MAX))
+    end
+    return quests
+end
+
 function Char.Build()
     return {
         gear = Char.Gear(),
         talents = Char.Talents(),
         lockouts = Char.Lockouts(),
+        quests = Char.Quests(),
     }
 end
 

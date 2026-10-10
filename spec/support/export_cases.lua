@@ -31,6 +31,39 @@ local cases = {
     { name = "char-beta-region-90-guessed-from-enGB", section = "char", setup = function()
         WowStub.state.region, WowStub.state.locale = 90, "enGB" -- no /rl region: guessed eu
     end },
+    -- Phase 2 (ROK-1742): gender, every talent node positioned + named, quests.
+    { name = "char-forever-phase2", section = "char", setup = function()
+        local st = WowStub.state
+        _G.UnitSex = function() return 3 end
+        st.talentTrees = { [1117] = {} }
+        st.talentNodes = {}
+        local cols = { 1020, 1620, 2220, 2820, 5020, 5620, 6220, 6820, 9080, 9680, 10280, 10880 }
+        for i = 1, 52 do
+            local id = 105900 + i
+            st.talentTrees[1117][i] = id
+            st.talentNodes[id] = { activeRank = i == 1 and 1 or 0, maxRanks = (i % 5) + 1, entryIDs = { 130600 + i },
+                posX = cols[(i % 12) + 1] + (i == 7 and 10 or 0), posY = 2130 + 600 * (i % 7) }
+        end
+        _G.C_Traits.GetEntryInfo = function(_, e) return { definitionID = e + 4801 } end
+        _G.C_Traits.GetDefinitionInfo = function(d) return { spellID = d - 115000 } end
+        _G.C_Spell = { GetSpellName = function(id) return "Talent " .. id end }
+        local done = {}
+        for i = 1, 75 do done[i] = 6 + i * 7 end
+        _G.C_QuestLog = {
+            GetAllCompletedQuestIDs = function() return done end,
+            GetNumQuestLogEntries = function() return 3, 2 end,
+            GetInfo = function(i)
+                return ({ { title = "Elwynn Forest", isHeader = true },
+                    { questID = 60, title = "Kobold Candles" }, { questID = 98391, title = "The Sisterhood of Elune" } })[i]
+            end,
+            GetQuestObjectives = function(id)
+                if id == 60 then
+                    return { { text = "7/8 Large Candle", finished = false, numFulfilled = 7, numRequired = 8 } }
+                end
+                return {}
+            end,
+        }
+    end },
     { name = "guild-small-single-page", section = "guild", setup = function() end },
     { name = "guild-notes-on", section = "guild", setup = function(ns) ns.HandleSlash("guildnotes on") end },
     { name = "guild-600-3pages", section = "guild", reversed = true,
