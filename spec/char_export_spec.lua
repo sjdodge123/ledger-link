@@ -6,13 +6,13 @@ local dkjson = require("dkjson")
 -- Every object there is .strict(): an extra key rejects the whole string.
 local ENVELOPE = { "addonVersion", "client", "data", "exportedAt", "schema", "section", "who" }
 local CLIENT = { "build", "interface", "locale", "region" }
-local WHO_ALLOWED = { "class", "faction", "fullName", "guid", "guildName", "level", "race", "raw", "ruleset" }
+local WHO_ALLOWED = { "class", "faction", "fullName", "gender", "guid", "guildName", "level", "race", "raw", "ruleset" }
 local WHO_REQUIRED = { "class", "faction", "fullName", "guid", "level", "race", "raw", "ruleset" }
 local RAW_ALLOWED = { "getUnitName", "realmName", "unitFullName", "unitName" }
 local CHAR_DATA = { "gear", "lockouts", "talents" }
 local GEAR_ALLOWED = { "ilvl", "itemId", "link", "slot" }
 local TALENTS_ALLOWED = { "configId", "importString", "nodes" }
-local NODE_ALLOWED = { "entryId", "nodeId", "rank" }
+local NODE_ALLOWED = { "col", "entryId", "maxRanks", "name", "nodeId", "posX", "posY", "rank", "row", "spellId", "tree" }
 local LOCKOUT = { "difficultyId", "instanceId", "killed", "name", "resetAt", "total" }
 
 local function keys(t)
@@ -105,7 +105,9 @@ describe("/rl export char", function()
         assertSubset(data.talents, TALENTS_ALLOWED, "talents")
         assert.equals(7, data.talents.configId)
         for _, node in ipairs(data.talents.nodes) do assertSubset(node, NODE_ALLOWED, "talent node") end
-        assert.same({ { nodeId = 101, rank = 2, entryId = 9001 }, { nodeId = 103, rank = 1 } }, data.talents.nodes)
+        -- Every node, rank 0 included (Raid Ledger ROK-1744 draws the full grid).
+        assert.same({ { nodeId = 101, rank = 2, entryId = 9001 }, { nodeId = 102, rank = 0 }, { nodeId = 103, rank = 1 } },
+            data.talents.nodes)
         assert.same({ LOCKOUT }, { keys(data.lockouts[1]) })
         assert.equals(1, #data.lockouts)
         assert.same({ name = "Molten Core", instanceId = 409, difficultyId = 9,

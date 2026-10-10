@@ -17,11 +17,19 @@ function ns.SafeCall(fn, ...)
     return unpack(results, 2, table.maxn(results))
 end
 
---- Truncate a string to `max` bytes; nil for anything that isn't a string.
+--- Truncate a string to at most `max` bytes without splitting a UTF-8 character;
+--- nil for anything that isn't a string.
 function ns.Clip(s, max)
     if type(s) ~= "string" then return nil end
-    if #s > max then return string.sub(s, 1, max) end
-    return s
+    if #s <= max then return s end
+    -- Never split a UTF-8 character: if the cut lands inside one, drop it whole.
+    local cut = max
+    local nextByte = s:byte(cut + 1)
+    if nextByte and nextByte >= 0x80 and nextByte < 0xC0 then
+        while cut > 0 and s:byte(cut) >= 0x80 and s:byte(cut) < 0xC0 do cut = cut - 1 end
+        cut = cut - 1
+    end
+    return string.sub(s, 1, math.max(cut, 0))
 end
 
 --- A whole number in [0, 2^31-1], or nil.
@@ -148,6 +156,9 @@ local function ruleset()
     return Identity.Ruleset() or Json.null
 end
 
+--- UnitSex: 2 male, 3 female; anything else (1 = unknown) is left out.
+local GENDERS = { [2] = "male", [3] = "female" }
+
 function Identity.Who()
     local rawGuid = ns.SafeCall(UnitGUID, "player")
     local guid = ns.NormalizeGuid(rawGuid)
@@ -175,5 +186,6 @@ function Identity.Who()
         level = level,
         faction = FACTIONS[faction] and faction or "Neutral",
         guildName = ns.Clip(ns.SafeCall(GetGuildInfo, "player"), 64),
+        gender = GENDERS[ns.SafeCall(UnitSex, "player") or 0],
     }
 end

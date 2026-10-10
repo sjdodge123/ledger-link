@@ -131,6 +131,15 @@ This repo pins a copy in `contract/v1/` (`SOURCE` = the Raid Ledger commit);
 refresh it with `tools/sync-contract.sh <raid-ledger-checkout> [ref]`, never by
 hand, and never change the format here (see `AGENTS.md`). Every object is strict:
 an unknown key rejects the whole string, so the addon never emits extra fields.
+Since the 2026-10-10 contract (Raid Ledger ROK-1742, `contract/v1` at
+`3b4418ff`) the `char` section also carries `who.gender`, **every** talent
+node (rank 0 included) with `name`, `spellId`, `maxRanks`, raw `posX`/`posY` and
+the `tree`/`row`/`col` hint from `TalentGrid.lua` (CONTRACT.md §3), and
+`data.quests`: completed quest ids ascending (capped at 10 000, then
+`completedTruncated: true` and a chat note) and up to 35 quest-log quests with up
+to 10 objectives each (`text`, `done`, `have`, `need`). A level-8 character's
+`char` string grows from about 0.7 KB to 2.6 KB.
+
 JSON is produced by the addon's own encoder (`Json.lua`) so empty lists encode
 as `[]` and an unknown ruleset as `null`; `C_EncodingUtil` does the zlib
 compression and base64.
@@ -205,7 +214,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `GetInstanceInfo()` 8th return = instance id | **confirmed** (Kalimdor = 1, 11 returns) (probe, 2026-10-05) | `instanceId` omitted |
 | `GetServerTime()` is unix seconds | **confirmed** (probe, 2026-10-05) | a millisecond value is divided down |
 | "LedgerLink has been blocked from an action only available to the Blizzard UI" | **found and fixed** (beta 2026-10-05, playing with a gamepad): the blocked function was `SetPreferredGamepadInteractTarget()`. The export window called `editBox:SetFocus()` while the game was still handling the `/rl` command, and the gamepad UI reacted inside that addon-started call chain; any click afterwards crashed the client. The addon no longer moves focus: the player clicks the text. Still recorded via `ADDON_ACTION_FORBIDDEN` / `ADDON_ACTION_BLOCKED` (chat line + `/rl probe`) | **confirmed fixed** on v0.1.0-alpha6 with a gamepad (2026-10-05): no popup, no crash |
-| Raid Ledger S3 request (2026-10-09): `UnitSex`, `C_Traits.GetEntryInfo` / `GetDefinitionInfo` + `C_Spell.GetSpellName` (talent names), node `posX`/`posY`, `C_QuestLog.GetAllCompletedQuestIDs` / `GetNumQuestLogEntries` / `GetInfo` / `GetQuestObjectives` | the `S3 …` lines at the end of `/rl probe` (also the char token size and what a completed-quest list would add); run it on a fresh **and** a max-level character | nothing is exported until Raid Ledger publishes the fields in `ledgerlink/v1` |
+| Raid Ledger S3 request (2026-10-09): `UnitSex`, `C_Traits.GetEntryInfo` / `GetDefinitionInfo` + `C_Spell.GetSpellName` (talent names), node `posX`/`posY`, `C_QuestLog.GetAllCompletedQuestIDs` / `GetNumQuestLogEntries` / `GetInfo` / `GetQuestObjectives` | **confirmed** on the beta (Warrior, Druid, Paladin; build 70291) and **exported since Phase 2** (`who.gender`, full talent nodes, `data.quests`); `/rl probe` still lists them as `S3 …` lines | each piece is left out when its API is missing |
 | Dungeon run + Forever "legacy talents" / "legacy challenges" (2026-10-09) | the `S4 …` lines of `/rl probe`, run **inside a dungeon** and again **after turning in its quests**: group (party GUID/name readability only, never values), map + dungeon-guide entry, difficulty, recorded pulls, every quest-log quest with level / suggested group / tag, dungeon quest flags, lockouts, every talent node with its computed tree/row/col, a scan for globals named legacy/forever/challenge (names only, never called), `C_Traits` systems 1-300 with a config, achievement categories (legacy/challenge ones in detail), item level / XP / professions | discovery only; nothing is exported |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
 
