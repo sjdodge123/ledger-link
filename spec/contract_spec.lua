@@ -65,8 +65,12 @@ describe("contract/v1", function()
     end
 
     -- Runs import + schema check; returns the import result, or nil and the error code.
-    local function importAndValidate(paste)
-        local ok, result = pcall(importString, paste)
+    -- ROK-1756: Raid Ledger pins its clock to one hour after the golden
+    -- fixtures' export stamp (2026-09-21); real beta strings use the real clock.
+    local FIXTURE_NOW = 1790000000 + 3600
+
+    local function importAndValidate(paste, now)
+        local ok, result = pcall(importString, paste, { now = now or FIXTURE_NOW })
         if not ok then return nil, assert(type(result) == "table" and result.code, tostring(result)) end
         local dir = os.tmpname()
         os.remove(dir)
@@ -194,7 +198,7 @@ describe("contract/v1", function()
         local names = fixtures("spec/fixtures/beta")
         assert.is_true(#names > 0, "no fixtures in spec/fixtures/beta")
         for _, name in ipairs(names) do
-            local result, code = importAndValidate(readFile(name .. ".txt"))
+            local result, code = importAndValidate(readFile(name .. ".txt"), os.time())
             assert(result, name .. ": rejected with " .. tostring(code))
         end
     end)

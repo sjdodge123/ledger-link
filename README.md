@@ -174,6 +174,15 @@ no `node_modules`), and checks that a paged guild paste decodes
 identically with its pages reversed. It also decodes the anonymised real
 strings in `spec/fixtures/beta/`, which `spec/contract_spec.lua` validates too.
 
+**Export clock window** (Raid Ledger ROK-1756): the server refuses an
+`exportedAt` (or guild `snapshotAt`) more than a day ahead of or a year behind
+its clock. `spec/support/import.lua` mirrors it with an explicit clock:
+`contract_spec` pins Raid Ledger's golden fixtures to 2026-09-21 + 1 h (as Raid
+Ledger's `pin-export-clock.ts` does) and checks the beta strings against the real
+clock. `tools/verify-with-raid-ledger.sh` runs Raid Ledger's real decoder with the
+real clock, so the generated test strings (stamped 2026-09-21) stop passing it
+after 2027-09-21; move the stub's `serverTime` forward then.
+
 **Real strings from testers** become fixtures only after
 `luajit tools/anonymise.lua <real.txt> spec/fixtures/beta/<name>.txt`: it
 replaces player names, GUIDs (server id kept), guild names, public notes and

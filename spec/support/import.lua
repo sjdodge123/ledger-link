@@ -98,6 +98,28 @@ local function assertSameExporter(groups)
     if high - low > SAME_EXPORT_WINDOW then fail("INVALID_PAYLOAD") end
 end
 
+-- ROK-1756 export clock window (addon-import.clock.ts): exportedAt (+ guild
+-- data.snapshotAt) within +1 day / -365 days of the server clock; raid pull
+-- times only get the +1 day bound. `now` is in seconds; nil skips the check.
+local DAY = 86400
+local function assertPlausibleTimes(payload, now)
+    if not now or type(payload) ~= "table" then return end
+    local recent, past = { payload.exportedAt }, {}
+    local data = type(payload.data) == "table" and payload.data or {}
+    if payload.section == "guild" then recent[#recent + 1] = data.snapshotAt end
+    if payload.section == "raid" then
+        for _, pull in ipairs(type(data.pulls) == "table" and data.pulls or {}) do
+            past[#past + 1], past[#past + 2] = pull.startAt, pull.endAt
+        end
+    end
+    for _, t in ipairs(recent) do
+        if type(t) == "number" and (t > now + DAY or t < now - 365 * DAY) then fail("INVALID_PAYLOAD") end
+    end
+    for _, t in ipairs(past) do
+        if type(t) == "number" and t > now + DAY then fail("INVALID_PAYLOAD") end
+    end
+end
+
 -- Returns { groups = { { section, pages, sections = {per page}, jsons = {page JSON},
 -- payloads = {...} }, ... } } in canonical order (char, guild, raid). For a
 -- single-section paste the first group's fields are also copied to the top
@@ -105,7 +127,8 @@ end
 -- same-exporter check needs decoded payloads and so runs only when every page
 -- parsed as JSON.
 -- Returns { pages = n, sections = {...}, jsons = {page JSON, sorted}, payloads = {...} }.
-return function(raw)
+return function(raw, opts)
+    local now = type(opts) == "table" and opts.now or nil
     local input = raw:match("^%s*(.-)%s*$")
     if #input > MAX_BYTES then fail("TOO_LARGE") end
     if input == "" then fail("BAD_HEADER") end
@@ -127,6 +150,7 @@ return function(raw)
         for i, h in ipairs(g.headers) do
             local page = decodePage(h)
             g.sections[i], g.jsons[i], g.payloads[i] = h.section, page.json, page.payload
+            assertPlausibleTimes(page.payload, now)
         end
     end
     local ok, err = pcall(assertSameExporter, groups)
