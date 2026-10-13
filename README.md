@@ -105,6 +105,8 @@ story or a GitHub issue). `/console scriptErrors 1` first so Lua errors show.
    game's controller UI and its button hints are showing): the `S6` lines
    look for what drives it. Before `/rl probe`, also press Triangle on any
    bag item and open its menu (then close it): the `S7` lines name that menu.
+10. **AH deposits (S8):** at the auction house, with the AH window open,
+    `/rl probe` and paste back the report. Nothing is posted.
 
 ## Reporting a bug
 
@@ -235,6 +237,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | Mailer discovery (2026-10-13, for a second addon) | first report (v1.3.1): Auctionator 340 loaded, `API.v1` includes `GetAuctionAgeByItemLink`, `IsAuctionDataExactByItemLink`, `GetDisenchantPriceByItemLink`; Disenchantry 1.1.1's `DisenchantryDB` holds settings only (no prices); `GetAddOnMetadata(name, "SavedVariables")` returns nil; `GetContainerItemInfo` fields and the sell price confirmed; the AH is the modern `C_AuctionHouse` (commodities); `ATTACHMENTS_MAX_SEND` 12; `GetSendMailPrice()` 30 with nothing attached; `Settings.RegisterCanvasLayoutCategory` present, `InterfaceOptions_AddCategory` missing; bag item buttons are unnamed (`ContainerFrame1Item1` missing). `ah=` was nil on every item (no Auctionator scan yet). The `S5 item` lines now also show `ahAge`, `ahExact` and `commodity`: rerun after an Auctionator scan | discovery only; nothing is mailed, bound, auto-completed or exported, and no player name is printed |
 | Forever's built-in gamepad UI ("smart navigation") | first report (v1.3.1, build 70338, 2026-10-13): the mail frames carry `FocusGamepad` / `InitializeGamepad` / `LockInFocus`, a `gamepadFooter` table, a `…FooterinputLegend` frame and a `smartNavigationFocusKey`; `C_Navigation`, `InputPromptMixin`, `InputPromptLegends` and `PromptedBindingFooterMixin` exist; no pad key has a normal binding (`GetBindingAction("PAD1")` = ""); `C_Console` is missing (`ConsoleGetAllCommands` exists). The `S6 …` lines now dump the footer tables and legend frames, every gamepad-related mixin, the `C_` navigation namespaces, `InputPromptLegends` and gamepad/cursor/smartnav CVars: run at a mailbox opened with the gamepad | discovery only; nothing found is called |
 | Gamepad "More" menu on a bag slot (Triangle; 2026-10-13, for a second addon's "Lock slot" entry) | the `S7 …` lines of `/rl probe`: context-action labels (`CONTEXT_ACTION_…`), context/menu mixins, the `Menu` / `MenuUtil` API (`Menu.ModifyMenu`), and every menu opened since login (method, owner frame, tag, entry texts). **Press Triangle on a bag item and open its menu before running the probe** | discovery only; the recorder is a post-hook that reads the menu and never changes it |
+| Auction house deposits (2026-10-13, for a second addon) | the `S8 …` lines of `/rl probe`, run **with the auction house open**: for each tradeable bag stack (commodity or item), the deposit for 12h / 24h / 48h, whole stack and one unit (`C_AuctionHouse.CalculateItemDeposit` / `CalculateCommodityDeposit`) next to its vendor price | calculations only; nothing is posted |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
 
 ## Releases

@@ -1043,6 +1043,64 @@ local function s7Lines(lines)
     end
 end
 
+-- ---------------------------------------------------------------------------
+-- "S8": auction house deposits (operator 2026-10-13: "the deposit should come
+-- from AH data"). Run with the auction house open. For each tradeable bag
+-- stack, the deposit C_AuctionHouse would charge for 12h / 24h / 48h, for the
+-- whole stack and for one unit, so a second addon can learn deposit as a share
+-- of vendor price. Calculations only: nothing is posted. Signatures from
+-- Blizzard_APIDocumentationGenerated/AuctionHouseDocumentation.lua (Forever):
+-- CalculateItemDeposit(itemLocation, duration, quantity),
+-- CalculateCommodityDeposit(itemID, duration, quantity); duration 1-3.
+
+local S8_DURATIONS = { "12h", "24h", "48h" }
+local S8_COMMODITY = 2 -- C_AuctionHouse.GetItemCommodityStatus: 1 item, 2 commodity (S5 report 2026-10-13)
+
+local function s8Deposits(itemId, location, commodity, quantity)
+    local parts = {}
+    for d, label in ipairs(S8_DURATIONS) do
+        local value
+        if commodity then
+            value = price("C_AuctionHouse.CalculateCommodityDeposit", itemId, d, quantity)
+        else
+            value = price("C_AuctionHouse.CalculateItemDeposit", location, d, quantity)
+        end
+        parts[#parts + 1] = label .. "=" .. value
+    end
+    return table.concat(parts, " ")
+end
+
+local function s8Lines(lines)
+    local frame = rawget(_G, "AuctionHouseFrame")
+    local shownStatus, shown = call(type(frame) == "table" and frame.IsShown, frame)
+    lines[#lines + 1] = "S8 AuctionHouseFrame shown = " .. (shownStatus == "ok" and tostring(shown) or shownStatus)
+        .. " (deposits need the auction house open)"
+    local numSlots = fn("C_Container.GetContainerNumSlots")
+    local itemInfo = fn("C_Container.GetContainerItemInfo")
+    local listed = 0
+    for bag = 0, tonumber(resolve("NUM_BAG_SLOTS")) or 4 do
+        local _, slots = call(numSlots, bag)
+        for slot = 1, tonumber(slots) or 0 do
+            local _, info = call(itemInfo, bag, slot)
+            local _, quest = call(fn("C_Container.GetContainerItemQuestInfo"), bag, slot)
+            local isQuest = type(quest) == "table" and quest.isQuestItem
+            if type(info) == "table" and not info.isBound and not isQuest and listed < S5_MAX_ITEMS then
+                listed = listed + 1
+                local _, location = call(fn("ItemLocation.CreateFromBagAndSlot"), resolve("ItemLocation"), bag, slot)
+                local _, status = call(fn("C_AuctionHouse.GetItemCommodityStatus"), location)
+                local commodity = status == S8_COMMODITY
+                local itemInfoResults = { call(fn("C_Item.GetItemInfo") or fn("GetItemInfo"), info.hyperlink) }
+                local count = tonumber(info.stackCount) or 1
+                lines[#lines + 1] = string.format('S8 deposit %d/%d id=%s %q %s sell=%s x%d: stack %s | one %s',
+                    bag, slot, tostring(info.itemID), linkName(info.hyperlink), commodity and "commodity" or "item",
+                    itemInfoResults[1] == "ok" and tostring(itemInfoResults[12]) or "?", count,
+                    s8Deposits(info.itemID, location, commodity, count), s8Deposits(info.itemID, location, commodity, 1))
+            end
+        end
+    end
+    if listed == 0 then lines[#lines + 1] = "S8 deposits: no tradeable bag items" end
+end
+
 local function s3Lines(lines)
     local sStatus, sex = call(UnitSex, "player")
     lines[#lines + 1] = 'S3 UnitSex("player") = ' .. (sStatus == "ok" and format(sex, 0) or sStatus)
@@ -1071,6 +1129,7 @@ function Probe.Report()
     s5Lines(lines)
     s6Lines(lines)
     s7Lines(lines)
+    s8Lines(lines)
     return table.concat(lines, "\n")
 end
 
