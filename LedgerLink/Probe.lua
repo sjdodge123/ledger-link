@@ -551,8 +551,8 @@ end
 -- name auto-complete, bag-frame and gamepad-binding APIs. Read-only: nothing is
 -- mailed, listed, bound or auto-completed, and no player name is printed.
 
-local S5_ADDONS = { "Auctionator", "Disenchantry", "TradeSkillMaster", "Postal", "ConsolePort", "Bagnon",
-    "Baganator", "AdiBags", "ArkInventory" }
+local S5_ADDONS = { "Auctionator", "Disenchantry", "TradeSkillMaster", "Postal", "ForeverMail", "ConsolePort",
+    "Bagnon", "Baganator", "AdiBags", "ArkInventory" }
 local S5_CALLER = "LedgerLink"
 local S5_MAX_ITEMS = 40
 local PAD_KEYS = { "PAD1", "PAD2", "PAD3", "PAD4", "PAD5", "PAD6", "PADDUP", "PADDRIGHT", "PADDDOWN", "PADDLEFT",
@@ -762,6 +762,97 @@ local function s5Lines(lines)
     s5Discover(lines)
 end
 
+-- ---------------------------------------------------------------------------
+-- "S6": Forever's built-in gamepad UI (operator screenshot 2026-10-13: L2/R2
+-- cycle windows, L1/R1 switch tabs, a footer of glyph hints "Cross Select /
+-- Square Open All / Circle Back", "Focus/Unfocus Interface"). Find what drives
+-- it, so a second addon's windows can join it instead of fighting it. Names,
+-- fields, child frame names and CVar values only: nothing else is called.
+
+local S6_WORDS = { "gamepad", "controller", "glyph", "footer", "prompt", "hint", "focus", "nav", "console", "cursor" }
+local S6_TABLE_WORDS = { "gamepad", "glyph", "footer", "hint", "prompt" }
+local S6_FRAMES = { "MailFrame", "InboxFrame", "SendMailFrame", "MailFrameTab1", "MailFrameTab2", "OpenAllMail",
+    "OpenMailFrame" }
+local S6_MAX_TABLES = 25
+
+local function frameName(f)
+    if type(f) ~= "table" then return tostring(f) end
+    local status, name = call(f.GetName, f)
+    if status == "ok" and name then return tostring(name) end
+    local dStatus, debugName = call(f.GetDebugName, f)
+    return (dStatus == "ok" and debugName) and ("(" .. tostring(debugName) .. ")") or "(anonymous)"
+end
+
+-- A frame's own Lua fields (template keys, mixin methods) and its child frames.
+local function s6Frame(lines, name)
+    local f = rawget(_G, name)
+    if type(f) ~= "table" then
+        lines[#lines + 1] = "S6 frame " .. name .. " = " .. (f == nil and "missing" or type(f))
+        return
+    end
+    local own = {}
+    for k, v in pairs(f) do
+        if k ~= 0 then own[tostring(k)] = v end
+    end
+    lines[#lines + 1] = string.format("S6 frame %s fields: %s", name, (keysOf(own, 80)))
+    local children = { call(f.GetChildren, f) }
+    if children[1] == "ok" then
+        local names = {}
+        for i = 2, table.maxn(children) do names[#names + 1] = frameName(children[i]) end
+        lines[#lines + 1] = string.format("S6 frame %s children (%d): %s", name, #names, table.concat(names, ", "))
+    end
+end
+
+local function s6Tables(lines)
+    -- Function names of every global table named like the gamepad UI (managers, mixins, footer frames).
+    local names = {}
+    for key, value in pairs(_G) do
+        if type(key) == "string" and type(value) == "table" then
+            local lower = key:lower()
+            for _, word in ipairs(S6_TABLE_WORDS) do
+                if lower:find(word, 1, true) then names[#names + 1] = key break end
+            end
+        end
+    end
+    table.sort(names)
+    for i, key in ipairs(names) do
+        if i > S6_MAX_TABLES then
+            lines[#lines + 1] = string.format("S6 tables: %d more not listed", #names - S6_MAX_TABLES)
+            break
+        end
+        local fns, total = keysOf(_G[key], 40, true)
+        lines[#lines + 1] = string.format("S6 table %s functions (%d): %s", key, total, fns)
+    end
+end
+
+local function s6CVars(lines)
+    local status, commands = call(fn("C_Console.GetAllCommands"))
+    if status ~= "ok" or type(commands) ~= "table" then
+        lines[#lines + 1] = "S6 CVars: C_Console.GetAllCommands " .. (status == "ok" and "nil" or status)
+        return
+    end
+    local out = {}
+    for _, c in ipairs(commands) do
+        local name = type(c) == "table" and c.command
+        local lower = type(name) == "string" and name:lower() or ""
+        if lower:find("gamepad", 1, true) or lower:find("cursor", 1, true) then
+            local _, value = call(fn("GetCVar"), name)
+            out[#out + 1] = name .. "=" .. tostring(value)
+        end
+    end
+    table.sort(out)
+    lines[#lines + 1] = string.format("S6 CVars matching gamepad|cursor (%d): %s", #out, table.concat(out, ", "))
+end
+
+local function s6Lines(lines)
+    for _, word in ipairs(S6_WORDS) do
+        lines[#lines + 1] = "S6 globals matching " .. word .. ": " .. globalsMatching({ word }, 60)
+    end
+    s6Tables(lines)
+    for _, name in ipairs(S6_FRAMES) do s6Frame(lines, name) end
+    s6CVars(lines)
+end
+
 local function s3Lines(lines)
     local sStatus, sex = call(UnitSex, "player")
     lines[#lines + 1] = 'S3 UnitSex("player") = ' .. (sStatus == "ok" and format(sex, 0) or sStatus)
@@ -788,6 +879,7 @@ function Probe.Report()
     end
     s3Lines(lines)
     s5Lines(lines)
+    s6Lines(lines)
     return table.concat(lines, "\n")
 end
 
