@@ -649,14 +649,25 @@ local function s5Item(lines, bag, slot, info)
     local _, quest = call(fn("C_Container.GetContainerItemQuestInfo"), bag, slot)
     quest = type(quest) == "table" and quest or {}
     local tsmStatus, tsmString = call(fn("TSM_API.ToItemString"), link)
+    -- Commodity (stackable, priced per unit on the modern AH) or item; needs an ItemLocation.
+    local commodity = "missing"
+    local locStatus, location = call(fn("ItemLocation.CreateFromBagAndSlot"), resolve("ItemLocation"), bag, slot)
+    if locStatus == "ok" and location ~= nil then
+        commodity = price("C_AuctionHouse.GetItemCommodityStatus", location)
+    elseif locStatus ~= "missing" then
+        commodity = "no ItemLocation"
+    end
     lines[#lines + 1] = string.format('S5 item %d/%d id=%s %q x%s quality=%s bound=%s noValue=%s locked=%s'
-        .. ' quest=%s class=%s/%s equip=%s sell=%s ah=%s de=%s tsmMarket=%s',
+        .. ' quest=%s class=%s/%s equip=%s sell=%s ah=%s ahAge=%s ahExact=%s de=%s commodity=%s tsmMarket=%s',
         bag, slot, tostring(info.itemID), linkName(link), tostring(info.stackCount), tostring(info.quality),
         tostring(info.isBound), tostring(info.hasNoValue), tostring(info.isLocked),
         tostring(quest.isQuestItem), tostring(instant[7]), tostring(instant[8]), format(instant[5], 0),
         itemInfo[1] == "ok" and tostring(itemInfo[12]) or itemInfo[1],
         price("Auctionator.API.v1.GetAuctionPriceByItemLink", S5_CALLER, link),
+        price("Auctionator.API.v1.GetAuctionAgeByItemLink", S5_CALLER, link),
+        price("Auctionator.API.v1.IsAuctionDataExactByItemLink", S5_CALLER, link),
         price("Auctionator.API.v1.GetDisenchantPriceByItemLink", S5_CALLER, link),
+        commodity,
         tsmStatus == "ok" and price("TSM_API.GetCustomPriceValue", "DBMarket", tsmString) or tsmStatus)
 end
 
@@ -763,17 +774,27 @@ local function s5Lines(lines)
 end
 
 -- ---------------------------------------------------------------------------
--- "S6": Forever's built-in gamepad UI (operator screenshot 2026-10-13: L2/R2
--- cycle windows, L1/R1 switch tabs, a footer of glyph hints "Cross Select /
--- Square Open All / Circle Back", "Focus/Unfocus Interface"). Find what drives
--- it, so a second addon's windows can join it instead of fighting it. Names,
--- fields, child frame names and CVar values only: nothing else is called.
+-- "S6": Forever's built-in gamepad UI. The first report (v1.3.1, 2026-10-13)
+-- showed it is Blizzard's "smart navigation": the mail frames carry
+-- FocusGamepad / InitializeGamepad / LockInFocus methods, a gamepadFooter table
+-- plus a "...FooterinputLegend" frame (the "Cross Select / Square Open All"
+-- bar) and a smartNavigationFocusKey; C_Navigation, InputPromptMixin,
+-- InputPromptLegends and PromptedBindingFooterMixin exist. These lines look
+-- inside them, so a second addon can add its own footer action (Triangle) and
+-- join the window cycle. Reads tables and names only: nothing is called except
+-- read-only getters (GetName, GetChildren, GetCVar, the console command list).
 
-local S6_WORDS = { "gamepad", "controller", "glyph", "footer", "prompt", "hint", "focus", "nav", "console", "cursor" }
-local S6_TABLE_WORDS = { "gamepad", "glyph", "footer", "hint", "prompt" }
-local S6_FRAMES = { "MailFrame", "InboxFrame", "SendMailFrame", "MailFrameTab1", "MailFrameTab2", "OpenAllMail",
-    "OpenMailFrame" }
-local S6_MAX_TABLES = 25
+local S6_FRAMES = { "MailFrame", "InboxFrame", "SendMailFrame" }
+local S6_FOOTERS = { "InboxFrame", "SendMailFrame", "OpenMailFrame" }
+local S6_LEGENDS = { "InboxFrame.InboxFooterinputLegend", "SendMailFrame.SendMailFooterinputLegend",
+    "OpenMailFrame.OpenMailFooterinputLegend" }
+local S6_MIXIN_WORDS = { "gamepad", "smartnav", "navigation", "focus", "legend", "inputprompt", "prompt", "footer",
+    "jumphint" }
+-- Methods the mail frames' gamepad support exposes: a mixin carrying any of them is the one to reuse.
+local S6_GAMEPAD_METHODS = { "FocusGamepad", "InitializeGamepad", "SetupGamepad", "StartFocus", "LockInFocus",
+    "UnfocusGamepad", "RefreshFocus", "GetFocusFrameRoot" }
+local S6_MAX_MIXINS = 40
+local S6_MAX_LINE = 3000
 
 local function frameName(f)
     if type(f) ~= "table" then return tostring(f) end
@@ -783,73 +804,143 @@ local function frameName(f)
     return (dStatus == "ok" and debugName) and ("(" .. tostring(debugName) .. ")") or "(anonymous)"
 end
 
+-- Deep, read-only dump: frames (tables holding [0] userdata) print as <frame Name>,
+-- functions as "function"; depth and length are capped.
+local function dump(v, depth, maxDepth)
+    local t = type(v)
+    if t == "string" then return string.format("%q", v) end
+    if t ~= "table" then return t == "function" and "function" or tostring(v) end
+    if rawget(v, 0) ~= nil then return "<frame " .. frameName(v) .. ">" end
+    if depth >= maxDepth then return "{...}" end
+    local keys = {}
+    for k in pairs(v) do keys[#keys + 1] = k end
+    table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+    local parts = {}
+    for i, k in ipairs(keys) do
+        if i > MAX_ITEMS then parts[#parts + 1] = "..." break end
+        parts[#parts + 1] = tostring(k) .. " = " .. dump(v[k], depth + 1, maxDepth)
+    end
+    return "{" .. table.concat(parts, ", ") .. "}"
+end
+
+local function capped(text)
+    if #text <= S6_MAX_LINE then return text end
+    return text:sub(1, S6_MAX_LINE) .. " ... (" .. (#text - S6_MAX_LINE) .. " more chars)"
+end
+
 -- A frame's own Lua fields (template keys, mixin methods) and its child frames.
-local function s6Frame(lines, name)
-    local f = rawget(_G, name)
+local function s6Frame(lines, path)
+    local f = resolve(path)
     if type(f) ~= "table" then
-        lines[#lines + 1] = "S6 frame " .. name .. " = " .. (f == nil and "missing" or type(f))
+        lines[#lines + 1] = "S6 frame " .. path .. " = " .. (f == nil and "missing" or type(f))
         return
     end
     local own = {}
     for k, v in pairs(f) do
         if k ~= 0 then own[tostring(k)] = v end
     end
-    lines[#lines + 1] = string.format("S6 frame %s fields: %s", name, (keysOf(own, 80)))
+    lines[#lines + 1] = string.format("S6 frame %s fields: %s", path, (keysOf(own, 80)))
     local children = { call(f.GetChildren, f) }
     if children[1] == "ok" then
         local names = {}
         for i = 2, table.maxn(children) do names[#names + 1] = frameName(children[i]) end
-        lines[#lines + 1] = string.format("S6 frame %s children (%d): %s", name, #names, table.concat(names, ", "))
+        lines[#lines + 1] = string.format("S6 frame %s children (%d): %s", path, #names, table.concat(names, ", "))
     end
 end
 
-local function s6Tables(lines)
-    -- Function names of every global table named like the gamepad UI (managers, mixins, footer frames).
+local function s6Footers(lines)
+    for _, name in ipairs(S6_FOOTERS) do
+        local f = rawget(_G, name)
+        local footer = type(f) == "table" and rawget(f, "gamepadFooter") or nil
+        lines[#lines + 1] = capped(string.format("S6 %s.gamepadFooter = %s", name, dump(footer, 0, 4)))
+        lines[#lines + 1] = string.format("S6 %s.smartNavigationFocusKey = %s", name,
+            format(type(f) == "table" and rawget(f, "smartNavigationFocusKey") or nil, 0))
+    end
+    for _, path in ipairs(S6_LEGENDS) do s6Frame(lines, path) end
+    local mail = rawget(_G, "MailFrame")
+    if type(mail) == "table" then
+        for _, key in ipairs({ "isFocused", "hasDoneInitialFocus", "selectedTab" }) do
+            lines[#lines + 1] = string.format("S6 MailFrame.%s = %s", key, format(rawget(mail, key), 0))
+        end
+        for _, key in ipairs({ "FocusJumpHint", "LeftJumpHint", "RightJumpHint", "TabIndicators" }) do
+            lines[#lines + 1] = capped(string.format("S6 MailFrame.%s = %s", key, dump(rawget(mail, key), 0, 1)))
+        end
+    end
+end
+
+local function hasAny(t, methods)
+    for _, m in ipairs(methods) do
+        if type(rawget(t, m)) == "function" then return true end
+    end
+    return false
+end
+
+local function s6Mixins(lines)
     local names = {}
     for key, value in pairs(_G) do
-        if type(key) == "string" and type(value) == "table" then
-            local lower = key:lower()
-            for _, word in ipairs(S6_TABLE_WORDS) do
-                if lower:find(word, 1, true) then names[#names + 1] = key break end
+        if type(key) == "string" and type(value) == "table" and key:match("Mixin$") then
+            local lower, match = key:lower(), hasAny(value, S6_GAMEPAD_METHODS)
+            for _, word in ipairs(S6_MIXIN_WORDS) do
+                if match then break end
+                match = lower:find(word, 1, true) ~= nil
             end
+            if match then names[#names + 1] = key end
         end
     end
     table.sort(names)
+    lines[#lines + 1] = string.format("S6 gamepad-related mixins (%d): %s", #names, table.concat(names, ", "))
     for i, key in ipairs(names) do
-        if i > S6_MAX_TABLES then
-            lines[#lines + 1] = string.format("S6 tables: %d more not listed", #names - S6_MAX_TABLES)
+        if i > S6_MAX_MIXINS then
+            lines[#lines + 1] = string.format("S6 mixins: %d more not listed", #names - S6_MAX_MIXINS)
             break
         end
-        local fns, total = keysOf(_G[key], 40, true)
-        lines[#lines + 1] = string.format("S6 table %s functions (%d): %s", key, total, fns)
+        lines[#lines + 1] = string.format("S6 mixin %s: %s", key, (keysOf(_G[key], 60, true)))
     end
 end
 
+local function s6Namespaces(lines)
+    local found = {}
+    for key, value in pairs(_G) do
+        if type(key) == "string" and key:match("^C_") and type(value) == "table" then
+            local lower = key:lower()
+            for _, word in ipairs({ "nav", "focus", "input", "prompt", "gamepad", "legend", "cursor" }) do
+                if lower:find(word, 1, true) then found[#found + 1] = key break end
+            end
+        end
+    end
+    table.sort(found)
+    for _, key in ipairs(found) do
+        lines[#lines + 1] = string.format("S6 %s functions: %s", key, (keysOf(_G[key], 80, true)))
+    end
+    lines[#lines + 1] = capped("S6 InputPromptLegends = " .. dump(rawget(_G, "InputPromptLegends"), 0, 3))
+    lines[#lines + 1] = "S6 globals matching smartnav|legend: " .. globalsMatching({ "smartnav", "legend" }, 60)
+end
+
 local function s6CVars(lines)
-    local status, commands = call(fn("C_Console.GetAllCommands"))
+    local status, commands = call(fn("C_Console.GetAllCommands") or fn("ConsoleGetAllCommands"))
     if status ~= "ok" or type(commands) ~= "table" then
-        lines[#lines + 1] = "S6 CVars: C_Console.GetAllCommands " .. (status == "ok" and "nil" or status)
+        lines[#lines + 1] = "S6 CVars: GetAllCommands " .. (status == "ok" and "nil" or status)
         return
     end
     local out = {}
     for _, c in ipairs(commands) do
         local name = type(c) == "table" and c.command
         local lower = type(name) == "string" and name:lower() or ""
-        if lower:find("gamepad", 1, true) or lower:find("cursor", 1, true) then
+        if lower:find("gamepad", 1, true) or lower:find("cursor", 1, true) or lower:find("smartnav", 1, true) then
             local _, value = call(fn("GetCVar"), name)
             out[#out + 1] = name .. "=" .. tostring(value)
         end
     end
     table.sort(out)
-    lines[#lines + 1] = string.format("S6 CVars matching gamepad|cursor (%d): %s", #out, table.concat(out, ", "))
+    lines[#lines + 1] = capped(string.format("S6 CVars matching gamepad|cursor|smartnav (%d): %s", #out,
+        table.concat(out, ", ")))
 end
 
 local function s6Lines(lines)
-    for _, word in ipairs(S6_WORDS) do
-        lines[#lines + 1] = "S6 globals matching " .. word .. ": " .. globalsMatching({ word }, 60)
-    end
-    s6Tables(lines)
     for _, name in ipairs(S6_FRAMES) do s6Frame(lines, name) end
+    s6Footers(lines)
+    s6Mixins(lines)
+    s6Namespaces(lines)
     s6CVars(lines)
 end
 
