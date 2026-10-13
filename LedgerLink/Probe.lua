@@ -544,6 +544,224 @@ local function s4Lines(lines)
     s4Character(lines)
 end
 
+-- ---------------------------------------------------------------------------
+-- "S5": discovery for a second addon (operator 2026-10-13: mail bag items worth
+-- more on the auction house, or disenchanted, to a bank alt). Price-source
+-- addons and what they expose, a valuation of the bags, and the mail, auction,
+-- name auto-complete, bag-frame and gamepad-binding APIs. Read-only: nothing is
+-- mailed, listed, bound or auto-completed, and no player name is printed.
+
+local S5_ADDONS = { "Auctionator", "Disenchantry", "TradeSkillMaster", "Postal", "ConsolePort", "Bagnon",
+    "Baganator", "AdiBags", "ArkInventory" }
+local S5_CALLER = "LedgerLink"
+local S5_MAX_ITEMS = 40
+local PAD_KEYS = { "PAD1", "PAD2", "PAD3", "PAD4", "PAD5", "PAD6", "PADDUP", "PADDRIGHT", "PADDDOWN", "PADDLEFT",
+    "PADLSTICK", "PADRSTICK", "PADLSHOULDER", "PADRSHOULDER", "PADLTRIGGER", "PADRTRIGGER", "PADFORWARD",
+    "PADBACK", "PADSYSTEM", "PADSOCIAL" }
+
+-- Sorted "name(type)" list of a table's keys, capped.
+local function keysOf(t, cap, onlyFunctions)
+    local out = {}
+    for k, v in pairs(t) do
+        if not onlyFunctions or type(v) == "function" then
+            out[#out + 1] = onlyFunctions and tostring(k) or (tostring(k) .. "(" .. type(v) .. ")")
+        end
+    end
+    table.sort(out)
+    local total = #out
+    if total > cap then
+        for k = total, cap + 1, -1 do out[k] = nil end
+        out[#out + 1] = "... " .. (total - cap) .. " more"
+    end
+    return table.concat(out, ", "), total
+end
+
+-- Global names containing any of `words` (case-insensitive), names only.
+local function globalsMatching(words, cap, onlyFunctions)
+    local found = {}
+    for key, value in pairs(_G) do
+        if type(key) == "string" and (not onlyFunctions or type(value) == "function") then
+            local lower = key:lower()
+            for _, word in ipairs(words) do
+                if lower:find(word, 1, true) then found[key] = value break end
+            end
+        end
+    end
+    return keysOf(found, cap, onlyFunctions)
+end
+
+local function s5Addons(lines)
+    local isLoaded = fn("C_AddOns.IsAddOnLoaded") or fn("IsAddOnLoaded")
+    local metadata = fn("C_AddOns.GetAddOnMetadata") or fn("GetAddOnMetadata")
+    for _, name in ipairs(S5_ADDONS) do
+        local _, loaded = call(isLoaded, name)
+        local _, version = call(metadata, name, "Version")
+        local _, sv = call(metadata, name, "SavedVariables")
+        local _, svChar = call(metadata, name, "SavedVariablesPerCharacter")
+        lines[#lines + 1] = string.format("S5 addon %s: loaded=%s version=%s SavedVariables=%s PerCharacter=%s",
+            name, tostring(loaded), format(version, 0), format(sv, 0), format(svChar, 0))
+        -- Top-level keys of each saved table: where the addon keeps its prices.
+        for _, names in ipairs({ sv, svChar }) do
+            for svName in (type(names) == "string" and names or ""):gmatch("[%w_]+") do
+                local t = rawget(_G, svName)
+                lines[#lines + 1] = type(t) == "table"
+                    and string.format("S5 %s saved %s keys: %s", name, svName, (keysOf(t, 30)))
+                    or string.format("S5 %s saved %s = %s", name, svName, type(t))
+            end
+        end
+    end
+    for _, path in ipairs({ "Auctionator.API.v1", "TSM_API" }) do
+        local t = resolve(path)
+        lines[#lines + 1] = "S5 " .. path .. " functions: " .. (type(t) == "table" and keysOf(t, 60, true) or "missing")
+    end
+    -- Disenchantry documents no API: find what it leaves in _G (names only, never called).
+    lines[#lines + 1] = "S5 globals matching disenchant|enchantry: " .. globalsMatching({ "disenchant", "enchantry" }, 40)
+    for key, value in pairs(_G) do
+        if type(key) == "string" and type(value) == "table" and key:lower():find("enchantry", 1, true) then
+            lines[#lines + 1] = string.format("S5 %s keys: %s", key, (keysOf(value, 40)))
+        end
+    end
+    local slash = type(SlashCmdList) == "table" and SlashCmdList or {}
+    local cmds = {}
+    for k in pairs(slash) do
+        if tostring(k):lower():find("enchant", 1, true) then cmds[#cmds + 1] = tostring(k) end
+    end
+    table.sort(cmds)
+    lines[#lines + 1] = "S5 slash commands matching enchant: " .. table.concat(cmds, ", ")
+end
+
+-- Hyperlink text "[Linen Cloth]" -> "Linen Cloth".
+local function linkName(link)
+    return type(link) == "string" and link:match("%[(.-)%]") or tostring(link)
+end
+
+local function price(path, ...)
+    local status, value = call(fn(path), ...)
+    if status == "missing" then return "missing" end
+    if status == "error" then return "error: " .. tostring(value):sub(1, 120) end
+    return tostring(value)
+end
+
+local function s5Item(lines, bag, slot, info)
+    local link = info.hyperlink
+    local itemInfo = { call(fn("C_Item.GetItemInfo") or fn("GetItemInfo"), link) }
+    local instant = { call(fn("C_Item.GetItemInfoInstant") or fn("GetItemInfoInstant"), link) }
+    local _, quest = call(fn("C_Container.GetContainerItemQuestInfo"), bag, slot)
+    quest = type(quest) == "table" and quest or {}
+    local tsmStatus, tsmString = call(fn("TSM_API.ToItemString"), link)
+    lines[#lines + 1] = string.format('S5 item %d/%d id=%s %q x%s quality=%s bound=%s noValue=%s locked=%s'
+        .. ' quest=%s class=%s/%s equip=%s sell=%s ah=%s de=%s tsmMarket=%s',
+        bag, slot, tostring(info.itemID), linkName(link), tostring(info.stackCount), tostring(info.quality),
+        tostring(info.isBound), tostring(info.hasNoValue), tostring(info.isLocked),
+        tostring(quest.isQuestItem), tostring(instant[7]), tostring(instant[8]), format(instant[5], 0),
+        itemInfo[1] == "ok" and tostring(itemInfo[12]) or itemInfo[1],
+        price("Auctionator.API.v1.GetAuctionPriceByItemLink", S5_CALLER, link),
+        price("Auctionator.API.v1.GetDisenchantPriceByItemLink", S5_CALLER, link),
+        tsmStatus == "ok" and price("TSM_API.GetCustomPriceValue", "DBMarket", tsmString) or tsmStatus)
+end
+
+local function s5Bags(lines)
+    local numSlots = fn("C_Container.GetContainerNumSlots") or fn("GetContainerNumSlots")
+    local itemInfo = fn("C_Container.GetContainerItemInfo")
+    local lastBag = tonumber(resolve("NUM_BAG_SLOTS")) or 4
+    lines[#lines + 1] = string.format("S5 bags: NUM_BAG_SLOTS=%s C_Container.GetContainerItemInfo=%s",
+        tostring(resolve("NUM_BAG_SLOTS")), type(itemInfo))
+    local shown, keysShown = 0, false
+    for bag = 0, lastBag do
+        local _, slots = call(numSlots, bag)
+        local _, free = call(fn("C_Container.GetContainerNumFreeSlots") or fn("GetContainerNumFreeSlots"), bag)
+        lines[#lines + 1] = string.format("S5 bag %d: %s slots, %s free", bag, tostring(slots), tostring(free))
+        for slot = 1, tonumber(slots) or 0 do
+            local _, info = call(itemInfo, bag, slot)
+            if type(info) == "table" then
+                if not keysShown then
+                    keysShown = true
+                    lines[#lines + 1] = "S5 GetContainerItemInfo fields: " .. (keysOf(info, 40))
+                end
+                shown = shown + 1
+                if shown <= S5_MAX_ITEMS then s5Item(lines, bag, slot, info) end
+            end
+        end
+    end
+    if shown > S5_MAX_ITEMS then lines[#lines + 1] = string.format("S5 items: %d more not listed", shown - S5_MAX_ITEMS) end
+end
+
+local S5_PRESENCE = {
+    -- bag frames (slot-lock overlays) and sorting (slots that move)
+    "ContainerFrame1", "ContainerFrame1Item1", "ContainerFrameCombinedBags", "C_Container.SortBags",
+    "C_Container.GetSortBagsRightToLeft", "C_Container.UseContainerItem", "C_Container.PickupContainerItem",
+    -- mail
+    "MailFrame", "SendMailFrame", "SendMailNameEditBox", "SendMailMailButton", "MailFrameTab2", "SendMail",
+    "ClickSendMailItemButton", "GetSendMailItem", "GetSendMailItemLink", "GetSendMailPrice", "SetSendMailMoney",
+    "ClearSendMail", "GetInboxNumItems", "C_Mail", "ATTACHMENTS_MAX_SEND", "ATTACHMENTS_MAX_RECEIVE",
+    -- auction house
+    "AuctionFrame", "AuctionHouseFrame", "C_AuctionHouse", "QueryAuctionItems", "GetAuctionItemInfo",
+    "CalculateAuctionDeposit", "GetAuctionDeposit", "GetAuctionSellItemInfo", "PostAuction",
+    -- settings panel + name auto-complete
+    "Settings", "Settings.RegisterCanvasLayoutCategory", "InterfaceOptions_AddCategory", "GetAutoCompleteResults",
+    "AutoCompleteEditBox_SetAutoCompleteSource", "AutoComplete_UpdateResults", "EditBox_HandleTabbing",
+    -- gamepad
+    "C_GamePad", "SetOverrideBindingClick", "SetOverrideBinding", "ClearOverrideBindings", "GetBindingAction",
+    "ConsolePort",
+}
+
+local function s5Apis(lines)
+    for _, path in ipairs(S5_PRESENCE) do
+        local v = resolve(path)
+        local shown = (type(v) == "number" or type(v) == "string") and (type(v) .. " " .. format(v, 0)) or type(v)
+        lines[#lines + 1] = "S5 " .. path .. " = " .. (v == nil and "missing" or shown)
+    end
+end
+
+local function s5State(lines)
+    for _, frameName in ipairs({ "MailFrame", "SendMailFrame", "AuctionFrame", "AuctionHouseFrame" }) do
+        local frame = rawget(_G, frameName)
+        if type(frame) == "table" and type(frame.IsShown) == "function" then
+            local _, shown = call(frame.IsShown, frame)
+            lines[#lines + 1] = string.format("S5 %s shown = %s", frameName, tostring(shown))
+        end
+    end
+    for _, spec in ipairs({ { "GetSendMailPrice" }, { "GetInboxNumItems" }, { "GetCVar", "GamePadEnable" },
+        { "C_GamePad.IsEnabled" }, { "C_GamePad.GetActiveDeviceID" } }) do
+        lines[#lines + 1] = "S5 " .. describeCall(spec)
+    end
+    -- What the mail name box auto-completes from (flags only; nothing is looked up).
+    local box = rawget(_G, "SendMailNameEditBox")
+    lines[#lines + 1] = "S5 SendMailNameEditBox.autoCompleteParams = "
+        .. format(type(box) == "table" and rawget(box, "autoCompleteParams") or nil, 0)
+    local flags = {}
+    for k, v in pairs(_G) do
+        if type(k) == "string" and k:match("^AUTOCOMPLETE_") and type(v) == "number" then flags[#flags + 1] = k .. "=" .. v end
+    end
+    table.sort(flags)
+    lines[#lines + 1] = "S5 AUTOCOMPLETE_ constants: " .. table.concat(flags, ", ")
+    local binding = fn("GetBindingAction")
+    local pads = {}
+    for _, key in ipairs(PAD_KEYS) do
+        local status, action = call(binding, key)
+        pads[#pads + 1] = key .. "=" .. (status ~= "ok" and status or (action ~= nil and action ~= "" and action or "-"))
+    end
+    lines[#lines + 1] = "S5 gamepad bindings: " .. table.concat(pads, ", ")
+end
+
+local function s5Discover(lines)
+    for _, path in ipairs({ "C_Mail", "C_AuctionHouse", "C_GamePad" }) do
+        local t = resolve(path)
+        if type(t) == "table" then lines[#lines + 1] = "S5 " .. path .. " functions: " .. keysOf(t, 80, true) end
+    end
+    lines[#lines + 1] = "S5 global functions matching mail: " .. globalsMatching({ "mail" }, 80, true)
+    lines[#lines + 1] = "S5 global functions matching auction: " .. globalsMatching({ "auction" }, 80, true)
+    lines[#lines + 1] = "S5 globals matching autocomplete: " .. globalsMatching({ "autocomplete" }, 40)
+end
+
+local function s5Lines(lines)
+    s5Addons(lines)
+    s5Bags(lines)
+    s5Apis(lines)
+    s5State(lines)
+    s5Discover(lines)
+end
+
 local function s3Lines(lines)
     local sStatus, sex = call(UnitSex, "player")
     lines[#lines + 1] = 'S3 UnitSex("player") = ' .. (sStatus == "ok" and format(sex, 0) or sStatus)
@@ -569,6 +787,7 @@ function Probe.Report()
         lines[#lines + 1] = path .. " = " .. (v == nil and "missing" or type(v))
     end
     s3Lines(lines)
+    s5Lines(lines)
     return table.concat(lines, "\n")
 end
 

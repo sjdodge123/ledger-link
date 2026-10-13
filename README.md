@@ -98,6 +98,10 @@ story or a GitHub issue). `/console scriptErrors 1` first so Lua errors show.
    whether the roster count matches your group.
 7. `/reload`, then `/rl raid` - is the pull still there? (SavedVariables bug.)
 8. Any Lua error popup text, verbatim.
+9. **Mailer discovery (S5, for a second addon):** with Auctionator and
+   Disenchantry installed and an Auctionator scan done, stand at a mailbox,
+   open it, click the **Send Mail** tab, then `/rl probe`. Paste back the whole
+   report. Nothing is mailed.
 
 ## Reporting a bug
 
@@ -216,6 +220,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | "LedgerLink has been blocked from an action only available to the Blizzard UI" | **found and fixed** (beta 2026-10-05, playing with a gamepad): the blocked function was `SetPreferredGamepadInteractTarget()`. The export window called `editBox:SetFocus()` while the game was still handling the `/rl` command, and the gamepad UI reacted inside that addon-started call chain; any click afterwards crashed the client. The addon no longer moves focus: the player clicks the text. Still recorded via `ADDON_ACTION_FORBIDDEN` / `ADDON_ACTION_BLOCKED` (chat line + `/rl probe`) | **confirmed fixed** on v0.1.0-alpha6 with a gamepad (2026-10-05): no popup, no crash |
 | Raid Ledger S3 request (2026-10-09): `UnitSex`, `C_Traits.GetEntryInfo` / `GetDefinitionInfo` + `C_Spell.GetSpellName` (talent names), node `posX`/`posY`, `C_QuestLog.GetAllCompletedQuestIDs` / `GetNumQuestLogEntries` / `GetInfo` / `GetQuestObjectives` | **confirmed** on the beta (Warrior, Druid, Paladin; build 70291) and **exported since Phase 2** (`who.gender`, full talent nodes, `data.quests`); `/rl probe` still lists them as `S3 …` lines | each piece is left out when its API is missing |
 | Dungeon run + Forever "legacy talents" / "legacy challenges" (2026-10-09) | the `S4 …` lines of `/rl probe`, run **inside a dungeon** and again **after turning in its quests**: group (party GUID/name readability only, never values), map + dungeon-guide entry, difficulty, recorded pulls, every quest-log quest with level / suggested group / tag, dungeon quest flags, lockouts, every talent node with its computed tree/row/col, a scan for globals named legacy/forever/challenge (names only, never called), `C_Traits` systems 1-300 with a config, achievement categories (legacy/challenge ones in detail), item level / XP / professions | discovery only; nothing is exported |
+| Mailer discovery (2026-10-13, for a second addon) | the `S5 …` lines of `/rl probe`, run **at an open mailbox on the Send Mail tab** with Auctionator + Disenchantry installed: price addons (loaded, version, saved-table keys, `Auctionator.API.v1` / `TSM_API` function names, globals named disenchant/enchantry), every bag item with vendor / Auctionator / disenchant / TSM price, bound and quest flags, `GetContainerItemInfo` fields, mail / auction / settings / auto-complete / gamepad API presence, postage, `AUTOCOMPLETE_` flags, what each gamepad button is bound to, and global function names matching mail/auction | discovery only; nothing is mailed, bound, auto-completed or exported, and no player name is printed |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
 
 ## Releases
