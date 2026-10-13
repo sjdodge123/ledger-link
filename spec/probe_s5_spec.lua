@@ -16,7 +16,7 @@ end
 local STUBBED = { "C_AddOns", "Auctionator", "TSM_API", "DisenchantryDB", "C_Container", "GetItemInfo",
     "GetItemInfoInstant", "NUM_BAG_SLOTS", "MailFrame", "SendMailNameEditBox", "SendMail", "ClickSendMailItemButton",
     "GetSendMailPrice", "ATTACHMENTS_MAX_SEND", "AUTOCOMPLETE_FLAG_ALL", "GetAutoCompleteResults", "GetBindingAction",
-    "SetOverrideBindingClick", "C_GamePad", "GetCVar", "SlashCmdList" }
+    "SetOverrideBindingClick", "C_GamePad", "GetCVar", "SlashCmdList", "ItemLocation", "C_AuctionHouse" }
 
 local LINEN = "|cffffffff|Hitem:2589::::::::60:::::|h[Linen Cloth]|h|r"
 local SWORD = "|cff1eff00|Hitem:15210::::::::60:::::|h[Raider's Shortsword]|h|r"
@@ -86,15 +86,21 @@ describe("/rl probe: S5 mailer discovery", function()
             end,
             GetDisenchantPriceByItemLink = function(_, link) if link == SWORD then error("no enchant data") end end,
         } } }
+        _G.Auctionator.API.v1.GetAuctionAgeByItemLink = function(_, link) if link == LINEN then return 2 end error("x") end
+        _G.Auctionator.API.v1.IsAuctionDataExactByItemLink = function() return true end
+        _G.ItemLocation = { CreateFromBagAndSlot = function(_, bag, slot) return { bag = bag, slot = slot } end }
+        _G.C_AuctionHouse = { GetItemCommodityStatus = function(loc) return loc.bag == 0 and 1 or 2 end }
         _G.TSM_API = { ToItemString = function() return "i:2589" end, GetCustomPriceValue = function() return 40 end }
         local text = report(ns)
         has(text, "S5 bags: NUM_BAG_SLOTS=1")
         has(text, "S5 bag 0: 16 slots, 15 free")
         has(text, "S5 GetContainerItemInfo fields: hasNoValue(boolean), hyperlink(string)")
         has(text, 'S5 item 0/1 id=2589 "Linen Cloth" x12 quality=1 bound=false noValue=false locked=false quest=false'
-            .. ' class=7/5 equip="" sell=13 ah=35 de=nil tsmMarket=40')
+            .. ' class=7/5 equip="" sell=13 ah=35 ahAge=2 ahExact=true de=nil commodity=1 tsmMarket=40')
         has(text, 'S5 item 1/2 id=15210 "Raider\'s Shortsword" x1 quality=2')
-        has(text, 'class=2/7 equip="INVTYPE_WEAPON" sell=1520 ah=nil de=error: ')
+        has(text, 'class=2/7 equip="INVTYPE_WEAPON" sell=1520 ah=nil ahAge=error: ')
+        has(text, 'ahExact=true de=error: ')
+        has(text, 'no enchant data commodity=2 tsmMarket=40')
     end)
 
     it("reports mail, auto-complete and gamepad APIs without using them or printing names", function()
