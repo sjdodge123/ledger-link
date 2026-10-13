@@ -944,6 +944,105 @@ local function s6Lines(lines)
     s6CVars(lines)
 end
 
+-- ---------------------------------------------------------------------------
+-- "S7": the gamepad "More" menu on a bag slot (operator 2026-10-13: Triangle on
+-- an item opens a menu; a second addon wants a "Lock slot" entry in it). Static
+-- part: context-action labels, context/menu mixins and the Menu / MenuUtil API.
+-- Recorder: a post-hook (hooksecurefunc) on the menu manager's open functions
+-- that only notes which menu opened, its tag and its entry texts, so the probe
+-- can name the menu the player just opened. It never changes a menu.
+
+local S7_MAX = 10
+local menuOpens = {}
+Probe.menuOpens = menuOpens
+
+local function entryTexts(description)
+    local texts = {}
+    local elements = type(description) == "table" and rawget(description, "elementDescriptions") or nil
+    for _, e in ipairs(type(elements) == "table" and elements or {}) do
+        local text = type(e) == "table" and rawget(e, "text") or nil
+        texts[#texts + 1] = type(text) == "string" and text or "?"
+    end
+    return table.concat(texts, " | ")
+end
+
+local function recordMenu(method, owner, description)
+    local tag = type(description) == "table" and rawget(description, "tag") or nil
+    if tag == nil and type(description) == "table" then
+        local status, value = call(description.GetTag, description)
+        if status == "ok" then tag = value end
+    end
+    menuOpens[#menuOpens + 1] = {
+        method = method, owner = frameName(owner), tag = tag, entries = entryTexts(description),
+        fields = type(description) == "table" and (keysOf(description, 30)) or type(description),
+    }
+    while #menuOpens > S7_MAX do table.remove(menuOpens, 1) end
+end
+
+-- Installed once at load; every step is guarded so a client without the
+-- modern menu API just records nothing.
+function Probe.InstallMenuWatch()
+    local hook = rawget(_G, "hooksecurefunc")
+    if type(hook) ~= "function" then return end
+    local _, manager = call(fn("Menu.GetManager"))
+    if type(manager) == "table" then
+        for _, method in ipairs({ "OpenMenu", "OpenContextMenu" }) do
+            if type(manager[method]) == "function" then
+                pcall(hook, manager, method, function(_, owner, description)
+                    pcall(recordMenu, "Menu:" .. method, owner, description)
+                end)
+            end
+        end
+    end
+    local menuUtil = rawget(_G, "MenuUtil")
+    if type(menuUtil) == "table" and type(menuUtil.CreateContextMenu) == "function" then
+        pcall(hook, menuUtil, "CreateContextMenu", function(owner)
+            pcall(recordMenu, "MenuUtil.CreateContextMenu", owner, nil)
+        end)
+    end
+end
+
+local function s7Lines(lines)
+    local labels = {}
+    for key, value in pairs(_G) do
+        if type(key) == "string" and key:match("^CONTEXT_ACTION") and type(value) == "string" then
+            labels[#labels + 1] = key .. "=" .. format(value, 0)
+        end
+    end
+    table.sort(labels)
+    lines[#lines + 1] = capped(string.format("S7 context action labels (%d): %s", #labels, table.concat(labels, ", ")))
+    lines[#lines + 1] = "S7 globals matching contextaction|context_action|contextmenu|itemaction: "
+        .. globalsMatching({ "contextaction", "context_action", "contextmenu", "itemaction" }, 60)
+    local mixins = {}
+    for key, value in pairs(_G) do
+        if type(key) == "string" and type(value) == "table" and key:match("Mixin$") then
+            local lower = key:lower()
+            if lower:find("context", 1, true) or lower:find("menu", 1, true) then mixins[#mixins + 1] = key end
+        end
+    end
+    table.sort(mixins)
+    lines[#lines + 1] = string.format("S7 context/menu mixins (%d): %s", #mixins, table.concat(mixins, ", "))
+    for i, key in ipairs(mixins) do
+        if i > S6_MAX_MIXINS then break end
+        if key:lower():find("context", 1, true) then
+            lines[#lines + 1] = string.format("S7 mixin %s: %s", key, (keysOf(_G[key], 60, true)))
+        end
+    end
+    for _, path in ipairs({ "Menu", "MenuUtil" }) do
+        local t = resolve(path)
+        lines[#lines + 1] = "S7 " .. path .. " functions: " .. (type(t) == "table" and keysOf(t, 60, true) or "missing")
+    end
+    local _, manager = call(fn("Menu.GetManager"))
+    lines[#lines + 1] = "S7 Menu.GetManager() fields: " .. (type(manager) == "table" and keysOf(manager, 60) or tostring(manager))
+    if #menuOpens == 0 then
+        lines[#lines + 1] = "S7 menus opened this session: none recorded (press Triangle on a bag item, open its menu, then /rl probe)"
+    end
+    for i, m in ipairs(menuOpens) do
+        lines[#lines + 1] = capped(string.format("S7 menu opened %d: %s owner=%s tag=%s entries: %s; fields: %s", i,
+            m.method, m.owner, format(m.tag, 0), m.entries, m.fields))
+    end
+end
+
 local function s3Lines(lines)
     local sStatus, sex = call(UnitSex, "player")
     lines[#lines + 1] = 'S3 UnitSex("player") = ' .. (sStatus == "ok" and format(sex, 0) or sStatus)
@@ -971,8 +1070,11 @@ function Probe.Report()
     s3Lines(lines)
     s5Lines(lines)
     s6Lines(lines)
+    s7Lines(lines)
     return table.concat(lines, "\n")
 end
+
+Probe.InstallMenuWatch()
 
 Probe.FOOTER = "Click the text, Ctrl+C, then paste this report to the addon developer (not into Raid Ledger)"
 
