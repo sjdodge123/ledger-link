@@ -2,7 +2,9 @@
 
 A World of Warcraft: Forever addon that exports your character, guild roster and
 boss pulls as strings you
-paste into [Raid Ledger](https://raid.gamernight.net). Addons can't make network
+paste into your community's [Raid Ledger](https://sjdodge123.github.io/Raid-Ledger/)
+site. Raid Ledger is self-hosted ([GitHub](https://github.com/sjdodge123/Raid-Ledger)),
+so each guild or community runs its own. Addons can't make network
 calls, so Ledger Link works like WeakAuras / Details exports: it builds the
 data, compresses it, and shows it in a box you copy from.
 
@@ -71,7 +73,7 @@ its position is saved. The addon list shows the Ledger Link icon
    region); `/rl region us` (or `eu`, `kr`, `tw`) corrects a wrong guess.
 4. `/rl export char`, then **click the text** (that selects all of it) and
    Ctrl+C.
-5. In Raid Ledger: your character -> **Import string** -> paste.
+5. On your community's Raid Ledger site: your character -> **Import string** -> paste.
 
 ## Beta test checklist (operator)
 
