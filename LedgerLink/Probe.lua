@@ -1101,6 +1101,140 @@ local function s8Lines(lines)
     if listed == 0 then lines[#lines + 1] = "S8 deposits: no tradeable bag items" end
 end
 
+-- ---------------------------------------------------------------------------
+-- "S9": professions (Raid Ledger ROK-1907, 2026-10-22: a guild professions
+-- widget wants char.professions = { name, skill, maxSkill }[]). Can an addon
+-- read them on Forever? Three sources, each reported on its own, then one
+-- "S9 verdict" line per source that returned a profession. Read-only: never
+-- expands a skill header or opens a profession window. Signatures from the
+-- Forever UI source: GetProfessions() -> prof1, prof2, firstAid, fishing,
+-- cooking and GetProfessionInfo(index) -> name, texture, rank, maxRank,
+-- numSpells, spellOffset, skillLine, rankModifier (Camelot
+-- Blizzard_ProfessionsBook.lua); C_TradeSkillUI.GetProfessionInfoBySkillLineID
+-- (skillLine) -> table with skillLevel / maxSkillLevel; C_SkillInfo
+-- GetNumSkillLines() / GetSkillLineInfo(index) -> SkillLineAttributes
+-- (SkillInfoDocumentation.lua).
+
+local S9_SLOTS = { "prof1", "prof2", "firstAid", "fishing", "cooking" }
+local S9_MAX_SKILL_LINES = 80
+
+-- SkillLine IDs of the professions, so the C_SkillInfo list is matched without
+-- depending on the game language.
+local S9_PROFESSION_SKILLS = {
+    [164] = true, -- Blacksmithing
+    [165] = true, -- Leatherworking
+    [171] = true, -- Alchemy
+    [182] = true, -- Herbalism
+    [186] = true, -- Mining
+    [197] = true, -- Tailoring
+    [202] = true, -- Engineering
+    [333] = true, -- Enchanting
+    [393] = true, -- Skinning
+    [755] = true, -- Jewelcrafting
+    [773] = true, -- Inscription
+    [794] = true, -- Archaeology
+    [129] = true, -- First Aid
+    [185] = true, -- Cooking
+    [356] = true, -- Fishing
+}
+
+local function s9Entry(found, name, skill, maxSkill)
+    if name ~= nil and type(skill) == "number" and type(maxSkill) == "number" then
+        found[#found + 1] = string.format("%s %d/%d", tostring(name), skill, maxSkill)
+    end
+end
+
+local function failure(status, err)
+    return status == "error" and ("error: " .. tostring(err)) or status
+end
+
+-- GetProfessions + GetProfessionInfo, and C_TradeSkillUI for each skillLine.
+local function s9Professions(lines)
+    local viaInfo, viaTradeSkill = {}, {}
+    local results = { call(fn("GetProfessions")) }
+    if results[1] ~= "ok" then
+        lines[#lines + 1] = "S9 GetProfessions() = " .. failure(results[1], results[2])
+        return viaInfo, viaTradeSkill
+    end
+    local slots = {}
+    for i, label in ipairs(S9_SLOTS) do slots[i] = label .. "=" .. tostring(results[i + 1]) end
+    lines[#lines + 1] = "S9 GetProfessions() = " .. table.concat(slots, " ")
+    for i, label in ipairs(S9_SLOTS) do
+        local index = results[i + 1]
+        if index ~= nil then
+            local info = { call(fn("GetProfessionInfo"), index) }
+            if info[1] ~= "ok" then
+                lines[#lines + 1] = string.format("S9 GetProfessionInfo(%s) [%s] = %s", tostring(index), label,
+                    failure(info[1], info[2]))
+            else
+                local name, rank, maxRank, skillLine, modifier = info[2], info[4], info[5], info[8], info[9]
+                lines[#lines + 1] = string.format("S9 GetProfessionInfo(%s) [%s] name=%s skill=%s max=%s skillLine=%s"
+                    .. " modifier=%s", tostring(index), label, format(name, 0), tostring(rank), tostring(maxRank),
+                    tostring(skillLine), tostring(modifier))
+                s9Entry(viaInfo, name, rank, maxRank)
+                local tStatus, tInfo = call(fn("C_TradeSkillUI.GetProfessionInfoBySkillLineID"), skillLine)
+                lines[#lines + 1] = string.format("S9 C_TradeSkillUI.GetProfessionInfoBySkillLineID(%s) = %s",
+                    tostring(skillLine), tStatus == "ok" and format(tInfo, 0) or failure(tStatus, tInfo))
+                if tStatus == "ok" and type(tInfo) == "table" and (tInfo.skillLevel or 0) + (tInfo.maxSkillLevel or 0) > 0 then
+                    s9Entry(viaTradeSkill, tInfo.professionName or name, tInfo.skillLevel, tInfo.maxSkillLevel)
+                end
+            end
+        end
+    end
+    return viaInfo, viaTradeSkill
+end
+
+-- C_SkillInfo: the Skills tab's list. Every line is printed (weapons and
+-- languages too) so the categories can be read; professions are marked.
+local function s9SkillLines(lines)
+    local found = {}
+    local nStatus, n = call(fn("C_SkillInfo.GetNumSkillLines"))
+    if nStatus ~= "ok" then
+        lines[#lines + 1] = "S9 C_SkillInfo.GetNumSkillLines() = " .. failure(nStatus, n)
+        return found
+    end
+    lines[#lines + 1] = "S9 C_SkillInfo.GetNumSkillLines() = " .. tostring(n)
+    for i = 1, math.min(tonumber(n) or 0, S9_MAX_SKILL_LINES) do
+        local status, info = call(fn("C_SkillInfo.GetSkillLineInfo"), i)
+        if status ~= "ok" then
+            lines[#lines + 1] = string.format("S9 skill line %d = %s", i, failure(status, info))
+        elseif type(info) ~= "table" then
+            lines[#lines + 1] = string.format("S9 skill line %d = %s", i, tostring(info))
+        elseif info.isHeader then
+            lines[#lines + 1] = string.format("S9 skill header %d %s%s", i, format(info.name, 0),
+                info.isCollapsed and " (collapsed: expand it on the Skills tab and probe again)" or "")
+        else
+            local isProfession = S9_PROFESSION_SKILLS[info.skillID]
+            lines[#lines + 1] = string.format("S9 skill line %d %s skillID=%s rank=%s max=%s category=%s parent=%s%s",
+                i, format(info.name, 0), tostring(info.skillID), tostring(info.rank), tostring(info.maxRank),
+                tostring(info.skillLineCategoryID), tostring(info.parentSkillLineID),
+                isProfession and " <- profession" or "")
+            if isProfession then s9Entry(found, info.name, info.rank, info.maxRank) end
+        end
+    end
+    return found
+end
+
+local function s9Lines(lines)
+    local viaInfo, viaTradeSkill = s9Professions(lines)
+    local sources = {
+        { "GetProfessions + GetProfessionInfo", viaInfo },
+        { "C_TradeSkillUI.GetProfessionInfoBySkillLineID", viaTradeSkill },
+        { "C_SkillInfo.GetSkillLineInfo", s9SkillLines(lines) },
+    }
+    local any = false
+    for _, source in ipairs(sources) do
+        if #source[2] > 0 then
+            any = true
+            lines[#lines + 1] = "S9 verdict: YES via " .. source[1] .. ": " .. table.concat(source[2], ", ")
+        end
+    end
+    if not any then
+        lines[#lines + 1] = "S9 verdict: NO, no source returned a profession"
+            .. " (on a character with none, learn Cooking or Fishing and probe again)"
+    end
+end
+
 local function s3Lines(lines)
     local sStatus, sex = call(UnitSex, "player")
     lines[#lines + 1] = 'S3 UnitSex("player") = ' .. (sStatus == "ok" and format(sex, 0) or sStatus)
@@ -1130,6 +1264,7 @@ function Probe.Report()
     s6Lines(lines)
     s7Lines(lines)
     s8Lines(lines)
+    s9Lines(lines)
     return table.concat(lines, "\n")
 end
 
