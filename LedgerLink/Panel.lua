@@ -12,7 +12,7 @@ local RULESETS = {
 }
 local REGIONS = { "us", "eu", "kr", "tw", "cn" }
 
-local frame, title, pullsLabel, rulesetLabel, regionLabel, notesBox
+local frame, title, pullsLabel, rulesetLabel, regionLabel, notesBox, autoBox
 local rulesetButtons, regionButtons = {}, {}
 
 local function setShown(widget, shown)
@@ -26,7 +26,7 @@ local function clientRegionKnown()
 end
 
 local function create()
-    local f = ns.UI.Window("LedgerLinkPanel", 320, 322)
+    local f = ns.UI.Window("LedgerLinkPanel", 320, 352)
     title = ns.UI.Label(f, nil, "GameFontNormalLarge")
     title:SetPoint("TOP", 0, -18)
 
@@ -72,6 +72,13 @@ local function create()
     local notesLabel = ns.UI.Label(f, "Include public guild notes (officer notes never)", "GameFontHighlightSmall")
     notesLabel:SetPoint("LEFT", notesBox, "RIGHT", 2, 0)
 
+    y = y - 30
+    autoBox = CreateFrame("CheckButton", "LedgerLinkPanelAutoExport", f, "UICheckButtonTemplate")
+    autoBox:SetPoint("TOPLEFT", 20, y)
+    autoBox:SetScript("OnClick", function(self) ns.SetAutoExport(self:GetChecked()) end)
+    local autoLabel = ns.UI.Label(f, "Save an export on logout (Raid Ledger Companion)", "GameFontHighlightSmall")
+    autoLabel:SetPoint("LEFT", autoBox, "RIGHT", 2, 0)
+
     y = y - 38
     pullsLabel = ns.UI.Label(f, nil, "GameFontHighlight")
     pullsLabel:SetPoint("TOPLEFT", 24, y - 4)
@@ -108,6 +115,7 @@ function Panel.Refresh()
         if name == regionName then b:LockHighlight() else b:UnlockHighlight() end
     end
     notesBox:SetChecked(LedgerLinkDB.guildNotes and true or false)
+    autoBox:SetChecked(ns.Outbox.AutoEnabled())
     pullsLabel:SetText(Panel.GetPullsText())
 end
 

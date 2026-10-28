@@ -19,11 +19,23 @@ data, compresses it, and shows it in a box you copy from.
 /rl raid             how many pulls are recorded
 /rl raid clear       forget recorded pulls
 /rl guildnotes on|off  include PUBLIC notes in the guild export (default off)
+/rl autoexport on|off  save an Export all on logout for the Raid Ledger Companion (default on)
 /rl ruleset normal|pvp|rp|hardcore           tell the export your ruleset (Hardcore is detected automatically)
 /rl region us|eu|kr|tw|cn   override the region; only used when the game doesn't report one (beta), where it is otherwise guessed from the game language. Raid Ledger has no China region: cn exports won't import
 /rl status           last export times + recorded pull count
 /rl probe            all beta checks in one copyable report (for bug reports)
 ```
+
+**Raid Ledger Companion (outbox).** Every export also keeps a copy in
+SavedVariables, so the Raid Ledger Companion app can upload it after you log out
+or `/reload` (the game writes `WTF/Account/<ACCOUNT>/SavedVariables/LedgerLink.lua`
+then). One entry per character, latest wins, at most 10 characters:
+`LedgerLinkDB.outbox[<player GUID>] = { exportedAt, section, text, at, source }`,
+where `text` is exactly the copy-box text (a paged export: every page, one per
+line). On logout the addon also stores a fresh Export all by itself
+(`source = "logout"`); if the guild roster never loaded it stores the character
+alone, unless you clicked Export earlier in the session. Turn this off with
+`/rl autoexport off` or the panel checkbox. Pasting works exactly as before.
 
 **Guild export.** Officer notes are never read or exported, whatever your rank
 (`canViewOfficerNote` is always `false`). Public notes are left out unless you

@@ -41,12 +41,15 @@ function Export.BuildPayload(section, data)
     if not client then return nil, clientErr end
     local who, whoErr = ns.Identity.Who()
     if not who then return nil, whoErr end
+    local exportedAt = math.floor(ns.SafeCall(GetServerTime) or time())
+    -- Local note for the Companion outbox (Outbox.lua); not part of the payload.
+    Export.lastBuilt = { guid = who.guid, exportedAt = exportedAt }
     return {
         schema = Export.PAYLOAD_SCHEMA,
         section = section,
         addonVersion = ns.VERSION,
         client = client,
-        exportedAt = math.floor(ns.SafeCall(GetServerTime) or time()),
+        exportedAt = exportedAt,
         who = who,
         data = data,
     }
