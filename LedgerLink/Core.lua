@@ -40,6 +40,7 @@ local HELP = {
     "/rl status - show the last export times",
     "/rl probe - beta checks in one copyable report (paste it to the addon developer)",
     "/rl minimap on|off - show or hide the minimap button",
+    "/rl autoexport on|off - save an Export all on logout for the Raid Ledger Companion (default on)",
     "Paste the string into Raid Ledger: your character -> Import string.",
 }
 
@@ -100,6 +101,7 @@ local function showStatus()
     ns.Print("Ruleset: " .. (rulesetText == "not set" and "not set (/rl ruleset)" or rulesetText))
     local regionText = ns.Identity.RegionText()
     if regionText then ns.Print("Region: " .. regionText) end
+    ns.Print("Auto-export on logout: " .. (ns.Outbox.AutoEnabled() and "on" or "off (/rl autoexport on)"))
 end
 
 local function inCombat()
@@ -120,6 +122,7 @@ local function showExport(section)
     local bytes = 0
     for _, page in ipairs(pages) do bytes = bytes + #page end
     LedgerLinkDB.lastExport[section] = { at = time(), bytes = bytes, pages = #pages }
+    ns.Outbox.Store(section, table.concat(pages, "\n"))
     if #pages > 1 then
         ns.Print(string.format("The %s export has %d pages - copy each one (Next >).", section, #pages))
     end
@@ -135,6 +138,7 @@ local function showAll()
     end
     local text = table.concat(tokens, "\n")
     LedgerLinkDB.lastExport.all = { at = time(), bytes = #text, pages = #tokens }
+    ns.Outbox.Store("all", text)
     for _, note in ipairs(notes) do ns.Print(note) end
     ns.ExportFrame.Show("all", text, ns.ExportFrame.ALL_FOOTER)
 end
@@ -162,6 +166,21 @@ local function setGuildNotes(arg)
     end
     ns.SetGuildNotes(arg == "on")
     ns.Print("Public guild notes will " .. (arg == "on" and "" or "not ") .. "be included in /rl export guild.")
+end
+
+--- Auto-export on logout (Companion outbox, Outbox.lua). Default on.
+function ns.SetAutoExport(on)
+    LedgerLinkDB.autoExport = on and true or false
+    changed()
+end
+
+local function setAutoExport(arg)
+    if arg ~= "on" and arg ~= "off" then
+        ns.Print("Usage: /rl autoexport on|off (saves an Export all on logout for the Raid Ledger Companion)")
+        return
+    end
+    ns.SetAutoExport(arg == "on")
+    ns.Print("Auto-export on logout " .. (arg == "on" and "on." or "off. The Export button still saves a copy."))
 end
 
 function ns.ClearPulls()
@@ -209,6 +228,8 @@ function ns.HandleSlash(msg)
         raidCommand(rest)
     elseif cmd == "minimap" then
         minimapCommand(rest)
+    elseif cmd == "autoexport" then
+        setAutoExport(rest)
     else
         showHelp()
     end

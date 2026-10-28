@@ -13,6 +13,7 @@ Blocked.lua
 Json.lua
 Identity.lua
 Export.lua
+Outbox.lua
 TalentGrid.lua
 UI.lua
 ExportFrame.lua
