@@ -18,6 +18,7 @@ function ns.Init()
     LedgerLinkCharDB = type(LedgerLinkCharDB) == "table" and LedgerLinkCharDB or {}
     LedgerLinkDB.lastExport = LedgerLinkDB.lastExport or {}
     LedgerLinkDB.blocked = LedgerLinkDB.blocked or {}
+    if type(LedgerLinkDB.outbox) ~= "table" then LedgerLinkDB.outbox = {} end -- Outbox.lua
     if ns.Minimap then ns.Minimap.Init() end
 end
 
