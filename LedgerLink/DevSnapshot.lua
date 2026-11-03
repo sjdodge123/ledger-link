@@ -57,6 +57,8 @@ local function bytes(v) return #Json.encode(v) end
 local function scrub(s) return (string.gsub(s, "Player%-%d+%-%x+", "<guid>")) end
 local function text(s, max) return ns.Clip(scrub(tostring(s)), max) end
 local function orNull(v) if v == nil then return Json.null end return v end
+-- Json.encode throws on NaN/±inf; every number taken from the game passes through this.
+local function finite(v) return type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge end
 
 function DevSnapshot.Enabled()
     return type(LedgerLinkDB) == "table" and type(LedgerLinkDB.dev) == "table"
@@ -87,7 +89,7 @@ local function jsonValue(v, depth, cut)
     if v == nil then return Json.null end
     if kind == "boolean" then return v end
     if kind == "number" then
-        if v ~= v or v == math.huge or v == -math.huge then return tostring(v) end
+        if not finite(v) then return tostring(v) end
         return v
     end
     if kind == "string" then
@@ -126,7 +128,7 @@ local function client()
         interface = (iface and iface <= 9999999) and iface or 0,
         tocInterface = (toc and toc <= 9999999) and toc or Json.null,
         locale = text(call("GetLocale") or "", 8),
-        region = (type(region) == "number" and region == math.floor(region)) and region or Json.null,
+        region = (finite(region) and region == math.floor(region)) and region or Json.null,
     }
 end
 
@@ -144,7 +146,7 @@ local function character()
 end
 
 local function gameRule(name, value, isActive)
-    if type(value) ~= "number" or value ~= value then value = text(value, 64) end
+    if not finite(value) then value = text(value, 64) end
     local rule = { name = name, value = value, active = Json.null }
     local ok, active = pcall(isActive, value)
     if not ok then rule.error = text(active, 256)
@@ -242,8 +244,9 @@ local function section(id)
     return fitItem(item, "lines")
 end
 
-local function sections(snapshot)
-    local out, start = Json.array(), ns.SafeCall(resolve("debugprofilestop"))
+-- `start` is taken at the top of Build(), so S1/S2's pcalls count against the budget too.
+local function sections(snapshot, start)
+    local out = Json.array()
     for _, id in ipairs(DevSnapshot.SECTIONS) do
         local now = ns.SafeCall(resolve("debugprofilestop"))
         if type(start) == "number" and type(now) == "number" and now - start > DevSnapshot.TIME_BUDGET_MS then
@@ -287,6 +290,7 @@ end
 
 --- The snapshot as a Lua table (Json.encode gives the stored string).
 function DevSnapshot.Build()
+    local start = ns.SafeCall(resolve("debugprofilestop"))
     local snapshot = {
         snapshotVersion = 1,
         addonVersion = text(ns.VERSION or "?", 64),
@@ -297,7 +301,7 @@ function DevSnapshot.Build()
     }
     snapshot.calls = calls()
     snapshot.apis = apis()
-    snapshot.sections = sections(snapshot)
+    snapshot.sections = sections(snapshot, start)
     fitSnapshot(snapshot)
     return snapshot
 end

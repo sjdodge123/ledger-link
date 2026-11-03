@@ -107,20 +107,7 @@ function WowStub.reset()
 end
 WowStub.reset()
 
-local function s() --- C_GameRules with only IsGameRuleActive, and Enum.GameRule = `members`
---- (synthetic names). `active[name]` is the answer; a function value throws.
-function WowStub.gameRules(members, active)
-    local byValue = {}
-    for name, value in pairs(members) do byValue[value] = name end
-    _G.Enum.GameRule = members
-    _G.C_GameRules = { IsGameRuleActive = function(value)
-        local answer = active[byValue[value]]
-        if type(answer) == "function" then return answer() end
-        return answer
-    end }
-end
-
-return WowStub.state end
+local function s() return WowStub.state end
 
 _G.unpack = _G.unpack or table.unpack -- luacheck: ignore 143
 _G.time = os.time

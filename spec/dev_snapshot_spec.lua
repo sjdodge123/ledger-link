@@ -205,6 +205,17 @@ describe("/rl dev snapshot", function()
         assert.truthy(rs.rules[2].error:find("boom", 1, true))
     end)
 
+    it("a non-finite region or Enum.GameRule value still encodes (region null, rule value a string)", function()
+        WowStub.state.region = math.huge
+        WowStub.gameRules({ Inf = math.huge, NegInf = -math.huge }, { Inf = true, NegInf = false })
+        local ok, json = pcall(function() return ns.Json.encode(ns.DevSnapshot.Build()) end)
+        assert(ok, json)
+        local snap = decode(json)
+        assert.equal(dkjson.null, snap.client.region)
+        assert.equal("string", type(snap.ruleset.rules[1].value))
+        assert.equal("string", type(snap.ruleset.rules[2].value))
+    end)
+
     it("IsGameRuleActive missing -> no rules, type recorded as nil", function()
         _G.Enum.GameRule = { SyntheticRuleA = 1 }
         local rs = ns.DevSnapshot.Build().ruleset
@@ -228,6 +239,17 @@ describe("/rl dev snapshot", function()
         local snap = ns.DevSnapshot.Build()
         assert.equal("skipped", snap.sections[1].status)
         assert.equal("skipped", snap.sections[2].status)
+        assert.is_true(snap.truncated)
+    end)
+
+    it("the 50 ms guard counts the time spent before the sections (S1/S2 calls)", function()
+        local clock, realStop, realBuildInfo = 0, _G.debugprofilestop, _G.GetBuildInfo
+        _G.debugprofilestop = function() return clock end
+        _G.GetBuildInfo = function(...) clock = clock + 60 return realBuildInfo(...) end
+        local ok, snap = pcall(ns.DevSnapshot.Build)
+        _G.debugprofilestop, _G.GetBuildInfo = realStop, realBuildInfo
+        assert(ok, snap)
+        assert.equal("skipped", snap.sections[1].status)
         assert.is_true(snap.truncated)
     end)
 
