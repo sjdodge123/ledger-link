@@ -19,6 +19,9 @@ function ns.Init()
     LedgerLinkDB.lastExport = LedgerLinkDB.lastExport or {}
     LedgerLinkDB.blocked = LedgerLinkDB.blocked or {}
     if type(LedgerLinkDB.outbox) ~= "table" then LedgerLinkDB.outbox = {} end -- Outbox.lua
+    -- DevSnapshot.lua: repaired, never created (off by default = no `dev` key).
+    if LedgerLinkDB.dev ~= nil and type(LedgerLinkDB.dev) ~= "table" then LedgerLinkDB.dev = nil end
+    if LedgerLinkDB.dev and type(LedgerLinkDB.dev.snapshots) ~= "table" then LedgerLinkDB.dev.snapshots = {} end
     if ns.Minimap then ns.Minimap.Init() end
 end
 
@@ -42,6 +45,7 @@ local HELP = {
     "/rl probe - beta checks in one copyable report (paste it to the addon developer)",
     "/rl minimap on|off - show or hide the minimap button",
     "/rl autoexport on|off - save an Export all on logout for the Raid Ledger Companion (default on)",
+    "/rl dev on|off - developer snapshot for the Raid Ledger Companion (default off)",
     "Paste the string into Raid Ledger: your character -> Import string.",
 }
 
@@ -208,6 +212,21 @@ local function raidCommand(arg)
     end
 end
 
+local function devCommand(arg)
+    local dev = ns.DevSnapshot
+    if arg == "on" then
+        dev.SetEnabled(true)
+        ns.Print("Dev snapshot on: a diagnostic snapshot is saved on every /reload or logout for the Raid Ledger"
+            .. " Companion. /rl dev off removes it.")
+    elseif arg == "off" then
+        dev.SetEnabled(false)
+        ns.Print("Dev snapshot off; saved snapshots removed.")
+    else
+        ns.Print(dev.Enabled() and string.format("Dev snapshot on (%d character(s) saved). /rl dev off removes it.",
+            dev.Count()) or "Dev snapshot off. /rl dev on saves a diagnostic snapshot on every /reload or logout.")
+    end
+end
+
 function ns.HandleSlash(msg)
     ns.lastCommand = "/rl " .. tostring(msg or "")
     local cmd, rest = string.match(string.lower(msg or ""), "^%s*(%S*)%s*(.-)%s*$")
@@ -231,6 +250,8 @@ function ns.HandleSlash(msg)
         minimapCommand(rest)
     elseif cmd == "autoexport" then
         setAutoExport(rest)
+    elseif cmd == "dev" then
+        devCommand(rest)
     else
         showHelp()
     end

@@ -88,22 +88,39 @@ local PRESENCE = {
     "C_Traits", "C_Item.GetDetailedItemLevelInfo", "C_Seasons",
 }
 
-local function describeCall(spec)
-    local path = spec[1]
-    local args = {}
-    for i = 2, #spec do args[#args + 1] = format(spec[i], 0) end
-    local label = path .. "(" .. table.concat(args, ", ") .. ")"
-    local fn = resolve(path)
-    if type(fn) ~= "function" then return label .. " = missing" end
+-- Name-bearing calls (they return names, GUIDs, a realm or a guild): the dev
+-- snapshot (DevSnapshot.lua) reports only whether they exist, never a value.
+Probe.NAME_BEARING = {
+    UnitGUID = true, GetUnitName = true, UnitFullName = true, UnitName = true, GetRealmName = true,
+    GetNormalizedRealmName = true, GetGuildInfo = true, GetGuildRosterInfo = true, GetGuildRosterLastOnline = true,
+}
+Probe.CALLS, Probe.PRESENCE, Probe.resolve = CALLS, PRESENCE, resolve
+
+--- Run one CALLS spec: { status = "ok"|"missing"|"error", values = {...}, n = count, error = text }.
+--- `redact` is applied to the values before anything sees them.
+function Probe.CallResult(spec)
+    local fn = resolve(spec[1])
+    if type(fn) ~= "function" then return { status = "missing", values = {}, n = 0 } end
     local results = { pcall(fn, unpack(spec, 2)) }
-    if not results[1] then return label .. " = error: " .. tostring(results[2]) end
+    if not results[1] then return { status = "error", error = tostring(results[2]), values = {}, n = 0 } end
     local n = table.maxn(results) - 1
     local values = {}
     for i = 1, n do values[i] = results[i + 1] end
     for i, replacement in pairs(spec.redact or {}) do
         if i <= n then values[i] = replacement end
     end
-    return label .. " = " .. formatResults(values, n)
+    return { status = "ok", values = values, n = n }
+end
+
+local function describeCall(spec)
+    local path = spec[1]
+    local args = {}
+    for i = 2, #spec do args[#args + 1] = format(spec[i], 0) end
+    local label = path .. "(" .. table.concat(args, ", ") .. ")"
+    local result = Probe.CallResult(spec)
+    if result.status == "missing" then return label .. " = missing" end
+    if result.status == "error" then return label .. " = error: " .. result.error end
+    return label .. " = " .. formatResults(result.values, result.n)
 end
 
 -- Raid Ledger request 2026-10-09 (planning-artifacts/LEDGERLINK-S3-REQUEST):
@@ -1242,8 +1259,11 @@ local function s3Lines(lines)
     local completed = s3Quests(lines)
     s3DungeonQuests(lines, completed)
     s3Size(lines, completed)
-    s4Lines(lines)
 end
+
+-- Section builders by id, for the dev snapshot (DevSnapshot.SECTIONS picks some).
+Probe.SECTION_BUILDERS = { S3 = s3Lines, S4 = s4Lines, S5 = s5Lines, S6 = s6Lines, S7 = s7Lines, S8 = s8Lines,
+    S9 = s9Lines }
 
 --- Plain-text report, one line per check.
 function Probe.Report()
@@ -1260,6 +1280,7 @@ function Probe.Report()
         lines[#lines + 1] = path .. " = " .. (v == nil and "missing" or type(v))
     end
     s3Lines(lines)
+    s4Lines(lines)
     s5Lines(lines)
     s6Lines(lines)
     s7Lines(lines)

@@ -18,6 +18,7 @@ TalentGrid.lua
 UI.lua
 ExportFrame.lua
 Probe.lua
+DevSnapshot.lua
 Panel.lua
 Minimap.lua
 Sections\Char.lua

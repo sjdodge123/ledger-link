@@ -57,6 +57,9 @@ local function defaultState()
         numGroupMembers = 0,
         units = {},
         instance = { "Molten Core", "raid", 9, "40 Player", 40, 0, false, 409 },
+        -- dev snapshot (ROK-2072): debugprofilestop() advances by clockStepMs per call
+        clockMs = 0, clockStepMs = 0,
+        tocInterface = "16001",
     }
 end
 
@@ -100,6 +103,7 @@ function WowStub.reset()
     _G.C_GameRules = nil -- tests that need it set their own
     _G.UnitSex, _G.C_QuestLog, _G.C_Spell = nil, nil, nil
     if _G.C_Traits then _G.C_Traits.GetEntryInfo, _G.C_Traits.GetDefinitionInfo = nil, nil end
+    if _G.Enum then _G.Enum.GameRule = nil end
 end
 WowStub.reset()
 
@@ -134,6 +138,9 @@ _G.UnitRace = function() return unpack(s().race, 1, 3) end
 _G.UnitLevel = function() return s().level end
 _G.UnitFactionGroup = function() return s().faction end
 _G.GetGuildInfo = function() return s().guild, "Raider", 3, s().guildRealm end
+_G.IsInGuild = function() return s().guild ~= nil end
+_G.debugprofilestop = function() s().clockMs = s().clockMs + s().clockStepMs return s().clockMs end
+_G.GetAddOnMetadata = function(_, field) if field == "Interface" then return s().tocInterface end end
 _G.GetNumGuildMembers = function() return #s().guildRoster, 0, 0 end
 _G.GetGuildRosterInfo = function(i) local r = s().guildRoster[i] if r then return unpack(r, 1, 17) end end
 _G.GetGuildRosterLastOnline = function(i) return unpack(s().lastOnline[i] or { 0, 0, 2, 5 }, 1, 4) end
@@ -229,5 +236,18 @@ _G.GetCursorPosition = function() return unpack(s().cursor, 1, 2) end
 _G.UISpecialFrames = {}
 _G.ChatFontNormal = {}
 _G.SlashCmdList = {}
+
+--- C_GameRules with only IsGameRuleActive, and Enum.GameRule = `members`
+--- (synthetic names). `active[name]` is the answer; a function value throws.
+function WowStub.gameRules(members, active)
+    local byValue = {}
+    for name, value in pairs(members) do byValue[value] = name end
+    _G.Enum.GameRule = members
+    _G.C_GameRules = { IsGameRuleActive = function(value)
+        local answer = active[byValue[value]]
+        if type(answer) == "function" then return answer() end
+        return answer
+    end }
+end
 
 return WowStub
