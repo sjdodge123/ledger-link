@@ -24,6 +24,7 @@ data, compresses it, and shows it in a box you copy from.
 /rl region us|eu|kr|tw|cn   override the region; only used when the game doesn't report one (beta), where it is otherwise guessed from the game language. Raid Ledger has no China region: cn exports won't import
 /rl status           last export times + recorded pull count
 /rl probe            all beta checks in one copyable report (for bug reports)
+/rl dev on|off       developer diagnostic snapshot for the Raid Ledger Companion (default off); /rl dev shows its state
 ```
 
 **Raid Ledger Companion (outbox).** Every export also keeps a copy in
@@ -36,6 +37,24 @@ line). On logout the addon also stores a fresh Export all by itself
 (`source = "logout"`); if the guild roster never loaded it stores the character
 alone, unless you clicked Export earlier in the session. Turn this off with
 `/rl autoexport off` or the panel checkbox. Pasting works exactly as before.
+
+**Dev snapshot (`/rl dev`, developers only).** Off by default; nothing is written
+until you type `/rl dev on`. While it is on, every logout or `/reload` stores one
+diagnostic JSON string per character in
+`LedgerLinkDB.dev.snapshots[<player GUID>]` (at most 10 characters, oldest
+dropped): client version/build/locale/region, class, level, faction and whether
+you are in a guild, each `Enum.GameRule` flag via `C_GameRules.IsGameRuleActive`, the result of each `/rl probe` API
+call, which watched APIs exist, and the probe's section lines (Raid Ledger
+ROK-2072, dev-bridge/v1 `ledgerlink-snapshot`). It is capped at 48 KiB and cut
+(marked `truncated`) rather than growing. The snapshot never holds a name,
+realm, guild name or GUID: name-bearing calls are recorded as "present" only and
+any GUID-shaped text is replaced with `<guid>`; only the table key is the GUID,
+as in the outbox. `/rl dev off` turns it off and deletes every saved snapshot;
+`/rl dev` (or `/rl dev status`) says whether it is on and how many characters
+are saved. The Raid Ledger Companion reads it from SavedVariables and keeps the
+latest plus 7 days of history on your own PC only (never uploaded to Raid
+Ledger), so a developer can query it over the Companion's local dev bridge
+instead of asking you to paste `/rl probe`.
 
 **Guild export.** Officer notes are never read or exported, whatever your rank
 (`canViewOfficerNote` is always `false`). Public notes are left out unless you
