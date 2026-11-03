@@ -27,6 +27,28 @@ local function count(t)
     return n
 end
 
+-- Runs a shell command; returns (succeeded, output). LuaJIT's popen():close()
+-- does not report the exit status, so the command echoes it.
+local function shell(cmd)
+    local p = assert(io.popen(cmd .. " 2>&1; echo \"__exit=$?\""))
+    local out = p:read("*a")
+    p:close()
+    local body, code = out:match("^(.-)__exit=(%d+)%s*$")
+    return tonumber(code) == 0, body
+end
+
+--- The stored JSON must pass ajv against the pinned Raid Ledger schema
+--- (contract/dev-bridge/v1, a copy refreshed only by tools/sync-contract.sh).
+local function assertPinnedSchema(json, label)
+    local path = os.tmpname()
+    local f = assert(io.open(path, "w"))
+    f:write(json)
+    f:close()
+    local ok, out = shell("node tools/validate-contract.mjs --dev-bridge ledgerlink-snapshot '" .. path .. "'")
+    os.remove(path)
+    assert(ok, label .. " violates contract/dev-bridge/v1 $defs/ledgerlink-snapshot:\n" .. out)
+end
+
 local function keysExactly(t, expected, label)
     for k in pairs(t) do assert(expected[k], label .. ": unexpected key " .. tostring(k)) end
 end
@@ -109,6 +131,7 @@ describe("/rl dev snapshot", function()
         assert.equal(1, count(LedgerLinkDB.dev.snapshots))
         assert.is_string(stored())
         local snap = assertShape(ns, stored())
+        assertPinnedSchema(stored(), "the normal snapshot")
         assert.equal("1.60.1", snap.client.version)
         assert.equal("70009", snap.client.build)
         assert.equal(16001, snap.client.interface)
@@ -256,6 +279,7 @@ describe("/rl dev snapshot", function()
         assert.is_true(#json <= ns.DevSnapshot.MAX_BYTES, "worst-case snapshot is " .. #json .. " bytes")
         assert.is_true(built.truncated)
         assertShape(ns, json)
+        assertPinnedSchema(json, "the worst-case snapshot")
     end)
 
     it("measures bytes like devBridgeJsonBytes (raw UTF-8, short escapes, \\u00XX controls)", function()
@@ -312,10 +336,9 @@ describe("/rl dev snapshot", function()
             for _, path in ipairs(list) do listed[path] = true end
         end
         for _, spec in ipairs(ns.Probe.CALLS) do listed[spec[1]] = true end
-        assert.is_true(count(listed) <= 160 + #ns.Probe.CALLS)
+        assert.is_true(#ns.DevSnapshot.Build().apis <= 160)
         local harness = set({ "WowStub", "unpack", "time", "date", "print", "CreateFrame", "UIParent", "Minimap",
-            "GameTooltip", "UISpecialFrames", "ChatFontNormal", "SlashCmdList", "LedgerLinkDB", "LedgerLinkCharDB",
-            "C_GameRules", "UnitSex", "C_QuestLog", "C_Spell" })
+            "GameTooltip", "UISpecialFrames", "ChatFontNormal", "SlashCmdList", "LedgerLinkDB", "LedgerLinkCharDB" })
         local missing = {}
         for name in io.open("spec/support/wow_stub.lua"):read("*a"):gmatch("\n_G%.([%w_]+)%s*=") do
             if not harness[name] then
