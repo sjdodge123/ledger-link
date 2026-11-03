@@ -218,8 +218,44 @@ describe("/rl dev snapshot", function()
         local s9 = snap.sections[2]
         assert.is_true(s9.truncated)
         assert.is_true(#s9.lines > 0 and #s9.lines <= 40)
-        assert.is_true(#ns.Json.encode(s9) <= 3072)
+        -- assertShape returns the dkjson value: re-mark its arrays before measuring with the addon's encoder
+        assert.is_true(#ns.Json.encode(addonValue(ns.Json, s9)) <= 3072)
         assert.is_true(snap.truncated)
+    end)
+
+    it("a worst-case snapshot (every section, call and rule over its cap) encodes within 48 KiB", function()
+        -- A control byte encodes as \u0001 (six bytes per input byte); short values pack every item to ~3 KiB.
+        local value, line = string.rep("\1", 70), string.rep("\1", 40)
+        for id in pairs(ns.Probe.SECTION_BUILDERS) do
+            ns.Probe.SECTION_BUILDERS[id] = function(lines) for i = 1, 1000 do lines[i] = line end end
+        end
+        local saved = {}
+        for _, spec in ipairs(ns.Probe.CALLS) do
+            local owner, key = _G, spec[1]
+            local head, tail = spec[1]:match("^([%w_]+)%.([%w_]+)$")
+            if head then owner, key = _G[head], tail end
+            if type(owner) == "table" then
+                saved[#saved + 1] = { owner, key, owner[key] }
+                owner[key] = function()
+                    local out = {}
+                    for i = 1, 60 do out[i] = value end
+                    return unpack(out)
+                end
+            end
+        end
+        local members, active = {}, {}
+        for i = 1, 100 do
+            local name = "Rule" .. string.rep("X", 56) .. string.format("%04d", i)
+            members[name], active[name] = i, i % 2 == 0
+        end
+        WowStub.gameRules(members, active)
+        local ok, built = pcall(ns.DevSnapshot.Build)
+        for i = #saved, 1, -1 do saved[i][1][saved[i][2]] = saved[i][3] end
+        assert(ok, built)
+        local json = ns.Json.encode(built)
+        assert.is_true(#json <= ns.DevSnapshot.MAX_BYTES, "worst-case snapshot is " .. #json .. " bytes")
+        assert.is_true(built.truncated)
+        assertShape(ns, json)
     end)
 
     it("measures bytes like devBridgeJsonBytes (raw UTF-8, short escapes, \\u00XX controls)", function()
