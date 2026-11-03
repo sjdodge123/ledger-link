@@ -6,7 +6,9 @@ LedgerLink's export strings are a wire format that Raid Ledger owns, at
 `packages/contract/ledgerlink/vN/` in the Raid Ledger repo (`CONTRACT.md`,
 `schema.json`, `fixtures/`, `CHANGELOG.md`). This repo pins a copy in
 `contract/vN/` (`contract/vN/SOURCE` records the Raid Ledger commit), refreshed
-only by `tools/sync-contract.sh`.
+only by `tools/sync-contract.sh`. The same script pins the `/rl dev` snapshot's
+contract, `packages/contract/companion/dev-bridge/v1/` → `contract/dev-bridge/v1/`,
+from the same Raid Ledger commit; the same rules apply to it.
 
 - **Never change the wire format here**: no new, renamed or removed keys, types,
   envelope fields, encoding or compression changes. Raid Ledger rejects a whole

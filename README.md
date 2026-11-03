@@ -171,7 +171,9 @@ The JSON is the Raid Ledger contract `ledgerlink/v1`, which **Raid Ledger owns**
 (`packages/contract/ledgerlink/v1/` there, generated from `AddonExportSchema`).
 This repo pins a copy in `contract/v1/` (`SOURCE` = the Raid Ledger commit);
 refresh it with `tools/sync-contract.sh <raid-ledger-checkout> [ref]`, never by
-hand, and never change the format here (see `AGENTS.md`). Every object is strict:
+hand, and never change the format here (see `AGENTS.md`). The same script also
+pins `contract/dev-bridge/v1/` (Raid Ledger `packages/contract/companion/dev-bridge/v1/`),
+whose `$defs/ledgerlink-snapshot` is the `/rl dev` snapshot. Every object is strict:
 an unknown key rejects the whole string, so the addon never emits extra fields.
 Since the 2026-10-10 contract (Raid Ledger ROK-1742, `contract/v1` at
 `3b4418ff`) the `char` section also carries `who.gender`, **every** talent
@@ -207,7 +209,9 @@ busted --lua=luajit
 real strings. `spec/contract_spec.lua` validates every page of every export
 case (`spec/support/export_cases.lua`) against `contract/v1/schema.json`, and
 decodes `contract/v1/fixtures/` once Raid Ledger publishes them; that is the CI
-gate. As an optional local cross-check, `tools/verify-with-raid-ledger.sh` decodes the strings
+gate. `spec/dev_snapshot_spec.lua` validates a normal and a worst-case `/rl dev`
+snapshot against `contract/dev-bridge/v1/schema.json` `$defs/ledgerlink-snapshot`
+(`node tools/validate-contract.mjs --dev-bridge ledgerlink-snapshot <file>`). As an optional local cross-check, `tools/verify-with-raid-ledger.sh` decodes the strings
 `tools/gen_strings.lua` generates (char, guild single + 3-page + 8-page +
 over-cap, raid) with Raid Ledger's actual server decoder
 (`RAID_LEDGER_DIR=<checkout>`; Export all strings need a checkout with
