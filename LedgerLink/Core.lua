@@ -41,7 +41,7 @@ local HELP = {
     "/rl export raid - recorded boss pulls (last 50)",
     "/rl raid clear - forget recorded boss pulls",
     "/rl guildnotes on|off - include public notes in the guild export (default off)",
-    "/rl ruleset normal|pvp|rp|rppvp|hardcore - set this character's ruleset (Hardcore is detected)",
+    "/rl ruleset normal|pvp|rp|rppvp|hardcore - set this character's ruleset (Hardcore and RP-PvP are detected)",
     "/rl region us|eu|kr|tw|cn - override the region where the game doesn't report one (beta; otherwise guessed from your game language)",
     "/rl status - show the last export times",
     "/rl probe - beta checks in one copyable report (paste it to the addon developer)",

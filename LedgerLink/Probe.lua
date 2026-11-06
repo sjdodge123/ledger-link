@@ -1269,9 +1269,9 @@ Probe.SECTION_BUILDERS = { S3 = s3Lines, S4 = s4Lines, S5 = s5Lines, S6 = s6Line
 function Probe.Report()
     local lines = {
         string.format("LedgerLink %s probe at %s", ns.VERSION, date("%Y-%m-%d %H:%M")),
-        string.format("settings: ruleset = %s, region = %s, recorded pulls = %d",
-            tostring(LedgerLinkCharDB and LedgerLinkCharDB.ruleset), tostring(LedgerLinkDB and LedgerLinkDB.region),
-            #ns.Raid.Pulls()),
+        string.format("settings: ruleset = %s (export sends: %s), region = %s, recorded pulls = %d",
+            tostring(LedgerLinkCharDB and LedgerLinkCharDB.ruleset), ns.Identity.RulesetText(),
+            tostring(LedgerLinkDB and LedgerLinkDB.region), #ns.Raid.Pulls()),
     }
     for _, line in ipairs(ns.Blocked.Lines()) do lines[#lines + 1] = line end
     for _, spec in ipairs(CALLS) do lines[#lines + 1] = describeCall(spec) end

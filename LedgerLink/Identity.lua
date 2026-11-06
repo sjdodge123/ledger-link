@@ -127,12 +127,24 @@ function ns.NormalizeGuid(guid)
     return prefix .. digits .. "-" .. string.upper(hex)
 end
 
---- The client has no realm-type API. C_GameRules.IsHardcoreActive() exists
---- on the WoW: Forever beta (false on PvP and PvE realms; true on Hardcore is
---- UNVERIFIED, see README "Beta unknowns"). Only a real `true` counts.
+--- "RP PvP", "RP-PvP" or "RPPvP" as a whole word somewhere in the realm name
+--- (live realms are named like "CAMWOW US2 Realm 9 RP PvP", Raid Ledger
+--- ROK-2101). Case-insensitive; "Sharpvp" does not match.
+local RPPVP_IN_REALM_NAME = "%f[%w]rp[%s%-]*pvp%f[%W]"
+
+function Identity.IsRpPvpRealmName(name)
+    return type(name) == "string" and string.find(string.lower(name), RPPVP_IN_REALM_NAME) ~= nil
+end
+
+--- The client has no realm-type API in game (the realm list's isRP/isPvP are
+--- glue-screen only). C_GameRules.IsHardcoreActive() exists on the WoW:
+--- Forever beta (false on PvP and PvE realms; true on Hardcore is UNVERIFIED,
+--- see README "Beta unknowns"); only a real `true` counts. RP-PvP is read off
+--- GetRealmName(), the one place the client spells the realm type out.
 local function detectRuleset()
     local rules = C_GameRules
     if type(rules) == "table" and ns.SafeCall(rules.IsHardcoreActive) == true then return "hardcore" end
+    if Identity.IsRpPvpRealmName(ns.SafeCall(GetRealmName)) then return "rppvp" end
     return nil
 end
 
