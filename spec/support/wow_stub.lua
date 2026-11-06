@@ -210,6 +210,7 @@ local function newWidget(kind, name)
         if key == "LockHighlight" then return function() self.highlighted = true end end
         if key == "UnlockHighlight" then return function() self.highlighted = false end end
         if key == "SetPoint" then return function(_, ...) self.point = { ... } end end
+        if key == "SetSize" then return function(_, width, height) self.width, self.height = width, height end end
         if key == "SetTexture" then return function(_, t) self.texture = t end end
         if key == "SetOwner" then return function() self.lines = {} end end
         if key == "AddLine" then return function(_, t) self.lines[#self.lines + 1] = t end end

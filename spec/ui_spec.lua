@@ -74,6 +74,32 @@ describe("panel", function()
         assert.is_true(WowStub.frames.LedgerLinkPanelRulesetpvp.highlighted)
     end)
 
+    it("offers RP-PvP, shown as RP-PvP in the panel, tooltip, status and usage", function()
+        click("LedgerLinkPanelRulesetrppvp")
+        assert.equal("rppvp", LedgerLinkCharDB.ruleset)
+        assert.is_true(WowStub.frames.LedgerLinkPanelRulesetrppvp.highlighted)
+        assert.is_false(WowStub.frames.LedgerLinkPanelRulesetroleplaying.highlighted)
+        assert.equal("RP-PvP", ns.Identity.RulesetText())
+        local b = WowStub.frames.LedgerLinkMinimapButton
+        b.scripts.OnEnter(b)
+        assert.truthy(table.concat(GameTooltip.lines, "\n"):find("RP-PvP", 1, true))
+        ns.HandleSlash("status")
+        assert.is_true(printedContains("Ruleset: RP-PvP"))
+        ns.HandleSlash("ruleset bogus")
+        assert.is_true(printedContains("/rl ruleset normal|pvp|rp|rppvp|hardcore"))
+    end)
+
+    it("keeps the five ruleset buttons inside the export button's row", function()
+        local total, last = 0, nil
+        for _, name in ipairs({ "normal", "pvp", "roleplaying", "rppvp", "hardcore" }) do
+            local b = assert(WowStub.frames["LedgerLinkPanelRuleset" .. name], name)
+            total = total + b.width
+            last = b
+        end
+        assert.equal(272, total + 4 * 2)
+        assert.equal(24 + 272, last.point[2] + last.width) -- "TOPLEFT", x, y
+    end)
+
     it("toggles public guild notes (officer notes are never offered)", function()
         local box = WowStub.frames.LedgerLinkPanelGuildNotes
         assert.is_false(box.checked)

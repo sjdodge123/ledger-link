@@ -89,6 +89,15 @@ describe("/rl export char", function()
         assert.equals("roleplaying", exportChar().payload.who.ruleset)
     end)
 
+    -- Contract v1 2026-11-06 (Raid Ledger ROK-2101): RP-PvP realms are "rppvp".
+    it("rppvp, rp-pvp and rpvp all send rppvp", function()
+        for _, alias in ipairs({ "rppvp", "rp-pvp", "rpvp", "RP-PvP" }) do
+            LedgerLinkCharDB.ruleset = nil
+            ns.HandleSlash("ruleset " .. alias)
+            assert.equals("rppvp", exportChar().payload.who.ruleset, alias)
+        end
+    end)
+
     it("region is the client's 1-5, else a picked or guessed region (never outside 1-5)", function()
         assert.equal(1, exportChar().payload.client.region)
         WowStub.state.region = 72

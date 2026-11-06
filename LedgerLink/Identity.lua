@@ -6,7 +6,9 @@ local Json = ns.Json
 local Identity = {}
 ns.Identity = Identity
 
-local RULESETS = { normal = true, pvp = true, roleplaying = true, hardcore = true }
+local RULESETS = { normal = true, pvp = true, roleplaying = true, rppvp = true, hardcore = true }
+--- How a ruleset reads in the panel, tooltip and /rl status (the wire value otherwise).
+local RULESET_LABELS = { rppvp = "RP-PvP" }
 local FACTIONS = { Alliance = true, Horde = true, Neutral = true }
 
 --- Call a WoW API that may be missing or throw on a beta build.
@@ -145,11 +147,12 @@ function Identity.Ruleset()
     return nil
 end
 
---- "pvp", "hardcore (detected)" or "not set", for the panel, tooltip and status.
+--- "pvp", "RP-PvP", "hardcore (detected)" or "not set", for the panel, tooltip and status.
 function Identity.RulesetText()
     local value, source = Identity.Ruleset()
     if not value then return "not set" end
-    return source == "detected" and (value .. " (detected)") or value
+    local text = RULESET_LABELS[value] or value
+    return source == "detected" and (text .. " (detected)") or text
 end
 
 local function ruleset()

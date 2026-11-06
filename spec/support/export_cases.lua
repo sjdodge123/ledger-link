@@ -16,6 +16,7 @@ end
 local cases = {
     { name = "char-full-normal", section = "char", setup = function(ns) ns.HandleSlash("ruleset normal") end },
     { name = "char-roleplaying", section = "char", setup = function(ns) ns.HandleSlash("ruleset rp") end },
+    { name = "char-rppvp", section = "char", setup = function(ns) ns.HandleSlash("ruleset rppvp") end },
     { name = "char-hardcore-detected", section = "char",
         setup = function() _G.C_GameRules = { IsHardcoreActive = function() return true end } end },
     { name = "char-ruleset-null-no-guild-empty", section = "char", setup = function()

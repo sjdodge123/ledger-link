@@ -6,9 +6,11 @@ local _, ns = ...
 local Panel = {}
 ns.Panel = Panel
 
+-- Five buttons across the 272 px row the Export button spans (2 px gaps).
 local RULESETS = {
-    { value = "normal", label = "Normal" }, { value = "pvp", label = "PvP" },
-    { value = "roleplaying", label = "RP" }, { value = "hardcore", label = "Hardcore" },
+    { value = "normal", label = "Normal", width = 52 }, { value = "pvp", label = "PvP", width = 44 },
+    { value = "roleplaying", label = "RP", width = 40 }, { value = "rppvp", label = "RP-PvP", width = 60 },
+    { value = "hardcore", label = "Hardcore", width = 68 },
 }
 local REGIONS = { "us", "eu", "kr", "tw", "cn" }
 
@@ -48,10 +50,11 @@ local function create()
     x = 24
     for _, r in ipairs(RULESETS) do
         local value = r.value
-        local b = ns.UI.Button(f, r.label, 66, function() ns.SetRuleset(value) end, "LedgerLinkPanelRuleset" .. value)
+        local b = ns.UI.Button(f, r.label, r.width, function() ns.SetRuleset(value) end,
+            "LedgerLinkPanelRuleset" .. value)
         b:SetPoint("TOPLEFT", x, y)
         rulesetButtons[value] = b
-        x = x + 68
+        x = x + r.width + 2
     end
 
     y = y - 30
