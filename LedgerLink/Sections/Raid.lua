@@ -1,8 +1,11 @@
 -- Boss-pull export (`!RL1!raid!...`). Contract: AddonRaidDataSchema.
 --
 -- ENCOUNTER_START / ENCOUNTER_END are recorded into a ring buffer in
--- LedgerLinkDB.raid.pulls (the newest Raid.MAX_PULLS pulls survive). Each pull
--- carries the group roster (<= 40 GUIDs + names) read at the pull.
+-- LedgerLinkDB.raid.pulls (the newest Raid.MAX_PULLS pulls survive, oldest
+-- first). Each pull carries the group roster (<= 40 GUIDs + names) read at the pull.
+-- Every export resends the whole buffer (the server dedupes re-sent pulls); when
+-- the string would not fit its byte budget, Export keeps the newest pulls that
+-- do fit (Raid.Newest, ROK-2123).
 -- No combat log: COMBAT_LOG_EVENT_UNFILTERED is unavailable on Forever, so
 -- there is no damage data and Details!/DBM-style CLEU parsing is impossible
 -- (spike 2026-10-04 §1). Unit GUIDs/names may be secret values during an
@@ -15,6 +18,8 @@ ns.Raid = Raid
 
 --- Ring-buffer cap (spike: "last 50 pulls"; contract allows 200).
 Raid.MAX_PULLS = 50
+--- Contract AddonRaidDataSchema.pulls max: never export more than this.
+Raid.MAX_EXPORT_PULLS = 200
 --- Contract AddonPullSchema.roster / rosterNames max.
 Raid.MAX_ROSTER = 40
 --- Contract unixSeconds ceiling (2100-01-01): anything larger is milliseconds.
@@ -28,6 +33,14 @@ local function store()
         LedgerLinkDB.raid = r
     end
     if type(r.pulls) ~= "table" then r.pulls = {} end
+    -- An older or hand-edited SavedVariables file may hold more than the ring
+    -- buffer: drop its oldest pulls so it stops growing (ROK-2123).
+    local extra = #r.pulls - Raid.MAX_PULLS
+    if extra > 0 then
+        local kept = {}
+        for i = extra + 1, #r.pulls do kept[#kept + 1] = r.pulls[i] end
+        r.pulls = kept
+    end
     return r
 end
 
@@ -169,16 +182,23 @@ local function exportRow(p)
     }
 end
 
-function Raid.Build()
+--- The newest `keep` pulls of built raid `data` (pulls stay oldest first).
+function Raid.Newest(data, keep)
     local pulls = Json.array()
+    for i = math.max(#data.pulls - keep + 1, 1), #data.pulls do pulls[#pulls + 1] = data.pulls[i] end
+    return { pulls = pulls }
+end
+
+function Raid.Build()
+    local rows = {}
     for _, p in ipairs(store().pulls) do
         local row = exportRow(p)
-        if row and #pulls < Raid.MAX_PULLS then pulls[#pulls + 1] = row end
+        if row then rows[#rows + 1] = row end
     end
-    if #pulls == 0 then
+    if #rows == 0 then
         return nil, "No boss pulls recorded yet. Ledger Link records a pull at every boss ENCOUNTER_START/END."
     end
-    return { pulls = pulls }
+    return Raid.Newest({ pulls = rows }, math.min(Raid.MAX_PULLS, Raid.MAX_EXPORT_PULLS))
 end
 
 local events = CreateFrame("Frame")
@@ -186,4 +206,6 @@ events:RegisterEvent("ENCOUNTER_START")
 events:RegisterEvent("ENCOUNTER_END")
 events:SetScript("OnEvent", function(_, event, ...) Raid.OnEvent(event, ...) end)
 
-ns.Export.RegisterSection("raid", Raid.Build)
+ns.Export.RegisterSection("raid", Raid.Build, {
+    fit = { count = function(data) return #data.pulls end, keep = Raid.Newest, noun = "pulls" },
+})

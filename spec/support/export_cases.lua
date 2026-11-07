@@ -3,6 +3,7 @@
 -- 3 and 8 pages, capped), raid (1 pull, ring buffer full). `reversed` marks
 -- paged cases that are also checked with the pages pasted in reverse order.
 local loadAddon = require("spec.support.load_addon")
+local seedPulls = require("spec.support.seed_pulls")
 
 local function raidPulls(ns, count, raidSize)
     WowStub.raid(raidSize)
@@ -84,6 +85,13 @@ local cases = {
     end },
     { name = "all-char-only", section = "all", setup = function() WowStub.state.guild = nil end },
     { name = "raid-50-pulls-ring-full", section = "raid", setup = function(ns) raidPulls(ns, 60, 40) end },
+    -- ROK-2123: an account whose SavedVariables hold 250 pulls, 40 distinct players each.
+    { name = "raid-250-stored-pulls-newest", section = "raid",
+        setup = function() LedgerLinkDB.raid = { pulls = seedPulls(250) } end },
+    { name = "raid-300-stored-pulls-capped-200", section = "raid", setup = function(ns)
+        ns.Raid.MAX_PULLS = 300 -- a ring buffer past the contract cap: the export stops at the newest 200
+        LedgerLinkDB.raid = { pulls = seedPulls(300) }
+    end },
 }
 
 -- Returns the export pages (strings) for one case, from a freshly loaded addon.

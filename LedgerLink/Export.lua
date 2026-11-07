@@ -21,9 +21,11 @@ local builders = {}
 --- builder() returns the section's `data` table, or nil + an error message.
 --- opts.paginate(data) -> list of per-page `data` tables (all sharing the
 --- envelope); opts.prepare(done) runs before the builder (async allowed).
+--- opts.fit = { count(data), keep(data, n), noun }: an unpaged section whose
+--- string is too large is cut to the largest n items (keep) that still fit.
 function Export.RegisterSection(name, builder, opts)
     opts = opts or {}
-    builders[name] = { build = builder, paginate = opts.paginate, prepare = opts.prepare }
+    builders[name] = { build = builder, paginate = opts.paginate, prepare = opts.prepare, fit = opts.fit }
 end
 
 --- Run the section's prepare step (e.g. a guild roster refresh), then done().
@@ -102,7 +104,10 @@ function Export.EncodedSize(text)
     return type(b64) == "string" and #b64 or nil
 end
 
-local function encodePages(section, payload, chunks)
+-- Returns the pages, or nil + a message (+ true when only the size was wrong).
+-- `budget` caps the whole paste (default MAX_PASTE_BYTES).
+local function encodePages(section, payload, chunks, budget)
+    budget = budget or Export.MAX_PASTE_BYTES
     local pages, total = {}, 0
     for i, chunk in ipairs(chunks) do
         -- One envelope for every page: same exportedAt + who (the server
@@ -112,21 +117,47 @@ local function encodePages(section, payload, chunks)
         local str, err = Export.Encode(section, payload, suffix)
         if not str then return nil, err end
         if #str > Export.MAX_STRING_BYTES then
-            return nil, string.format("The %s export is too large (%d KB).", section, math.floor(#str / 1024))
+            return nil, string.format("The %s export is too large (%d KB).", section, math.floor(#str / 1024)), true
         end
         total = total + #str + (i > 1 and 1 or 0)
         pages[i] = str
     end
-    if total > Export.MAX_PASTE_BYTES then
+    if total > budget then
         return nil, string.format("The %s export is too large to import (%d KB over %d pages; Raid Ledger takes %d KB).",
-            section, math.floor(total / 1024), #pages, Export.MAX_PASTE_BYTES / 1024)
+            section, math.floor(total / 1024), #pages, Export.MAX_PASTE_BYTES / 1024), true
     end
     return pages
 end
 
+-- A too-large unpaged `fit` section: binary-search the largest item count
+-- whose string fits (a few compressions, not one per item), keeping the
+-- builder's choice of items (raid: the newest pulls). Returns pages + a note,
+-- or nil when not even one item fits.
+local function fitPages(section, entry, payload, data, budget)
+    local fit = entry.fit
+    local total = fit.count(data)
+    local lo, hi, best, kept = 1, total - 1, nil, 0
+    while lo <= hi do
+        local mid = math.floor((lo + hi) / 2)
+        local pages, err, tooLarge = encodePages(section, payload, { fit.keep(data, mid) }, budget)
+        if pages then
+            best, kept, lo = pages, mid, mid + 1
+        elseif tooLarge then
+            hi = mid - 1
+        else
+            return nil, err
+        end
+    end
+    if not best then return nil end
+    return best, string.format("The %s export holds the newest %d of %d %s, to fit Raid Ledger's size limit.",
+        section, kept, total, fit.noun or "items")
+end
+
 --- Build + encode one section. Returns a list of page strings (one for an
---- unpaged section), or nil + a message.
-function Export.RunPages(section)
+--- unpaged section) and, if items were left out to fit, a note; or nil, a
+--- message and true when the only problem is size. `budget` caps the whole
+--- paste in bytes (default MAX_PASTE_BYTES; Export all passes what is left).
+function Export.RunPages(section, budget)
     local entry = builders[section]
     if not entry then
         return nil, "Unknown section '" .. tostring(section) .. "'. Use char, guild or raid."
@@ -140,7 +171,12 @@ function Export.RunPages(section)
         return nil, string.format("The %s export needs %d pages; Raid Ledger takes at most %d.",
             section, #chunks, Export.MAX_PAGES)
     end
-    return encodePages(section, payload, chunks)
+    local pages, err, tooLarge = encodePages(section, payload, chunks, budget)
+    if pages or not tooLarge or not entry.fit or entry.paginate then return pages, err, tooLarge end
+    local fitted, noteOrErr = fitPages(section, entry, payload, data, budget)
+    if fitted then return fitted, noteOrErr end
+    if noteOrErr then return nil, noteOrErr end -- encode failure while fitting
+    return nil, err, true -- not even one item fits
 end
 
 --- Build + encode one section as ONE paste: pages joined by newlines (the
@@ -150,6 +186,9 @@ function Export.Run(section)
     if not pages then return nil, err end
     return table.concat(pages, "\n")
 end
+
+local TOO_BIG_FOR_ONE_PASTE = "That's too big for one paste. Export the guild on its own (/rl export guild),"
+    .. " then the rest (/rl export char, /rl export raid)."
 
 --- "Export all" (Raid Ledger ROK-1737, CONTRACT.md §5.1): the char string,
 --- every guild page and the raid string, each in its own single-section
@@ -168,16 +207,21 @@ function Export.RunAll()
         notes[#notes + 1] = "You're not in a guild, so there's no guild section."
     end
     if #ns.Raid.Pulls() > 0 then
-        local raid, raidErr = Export.RunPages("raid")
-        if not raid then return nil, "Raid export: " .. tostring(raidErr) end
+        -- The raid gets what is left of the one paste (plus its newline), so
+        -- a full pull history is cut to its newest pulls instead of failing
+        -- the whole run (ROK-2123).
+        local left = Export.MAX_PASTE_BYTES - #table.concat(tokens, "\n") - 1
+        local raid, raidNote, tooLarge = Export.RunPages("raid", left)
+        if not raid then
+            if tooLarge then return nil, TOO_BIG_FOR_ONE_PASTE end
+            return nil, "Raid export: " .. tostring(raidNote)
+        end
         tokens[#tokens + 1] = raid[1]
+        if raidNote then notes[#notes + 1] = raidNote end
     else
         notes[#notes + 1] = "There are no boss pulls recorded, so there's no raid section."
     end
-    if #table.concat(tokens, "\n") > Export.MAX_PASTE_BYTES then
-        return nil, "That's too big for one paste. Export the guild on its own (/rl export guild),"
-            .. " then the rest (/rl export char, /rl export raid)."
-    end
+    if #table.concat(tokens, "\n") > Export.MAX_PASTE_BYTES then return nil, TOO_BIG_FOR_ONE_PASTE end
     return tokens, notes
 end
 

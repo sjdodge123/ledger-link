@@ -1,5 +1,6 @@
 local loadAddon = require("spec.support.load_addon")
 local decode = require("spec.support.decode")
+local seedPulls = require("spec.support.seed_pulls")
 
 -- Contract AddonPullSchema keys (wow-addon-export.schema.ts); all strict.
 local PULL_ALLOWED = { "difficultyId", "encounterId", "endAt", "groupSize", "instanceId", "name",
@@ -158,5 +159,117 @@ describe("raid pull recorder", function()
         assert.truthy(ns.ExportFrame.GetText():match("^!RL1!raid![A-Za-z0-9+/]+=*$"))
         assert.same({ 1, 1 }, { ns.ExportFrame.GetPage() })
         assert.equals("", ns.ExportFrame.GetPageLabel())
+    end)
+end)
+
+-- Raid Ledger ROK-2123: a long pull history must never make the raid export
+-- too large for Raid Ledger (pulls <= 200, paste <= 256 KiB); when something
+-- has to go, the oldest pulls go first.
+describe("raid pull history size", function()
+    local ns
+
+    before_each(function()
+        ns = loadAddon()
+        WowStub.raid(40)
+    end)
+
+    local function encounterIds(pulls)
+        local ids = {}
+        for i, p in ipairs(pulls) do ids[i] = p.encounterId end
+        return ids
+    end
+
+    it("an account with 250 stored pulls exports the newest 50, oldest first, under 256 KiB", function()
+        LedgerLinkDB.raid = { pulls = seedPulls(250) }
+        local text = assert(ns.Export.Run("raid"))
+        assert(#text <= 262144, "raid paste is " .. #text .. " bytes")
+        local pulls = decode(text).payload.data.pulls
+        assert.equals(50, #pulls)
+        assert.equals(1201, pulls[1].encounterId)
+        assert.equals(1250, pulls[50].encounterId)
+        assert.equals(40, #pulls[50].roster)
+        -- and the SavedVariables stop growing: the oldest 200 are gone
+        assert.equals(50, #LedgerLinkDB.raid.pulls)
+        assert.equals(1201, LedgerLinkDB.raid.pulls[1].encounterId)
+    end)
+
+    it("never exports more than the contract's 200 pulls, even from a bigger buffer", function()
+        ns.Raid.MAX_PULLS = 300
+        LedgerLinkDB.raid = { pulls = seedPulls(300) }
+        local text = assert(ns.Export.Run("raid"))
+        assert(#text <= 262144, "raid paste is " .. #text .. " bytes")
+        local pulls = decode(text).payload.data.pulls
+        assert.equals(200, #pulls)
+        assert.equals(1101, pulls[1].encounterId)
+        assert.equals(1300, pulls[200].encounterId)
+    end)
+
+    it("a raid string over its budget keeps the newest pulls that fit, and says so", function()
+        LedgerLinkDB.raid = { pulls = seedPulls(50) }
+        local full = assert(ns.Export.Run("raid"))
+        local budget = math.floor(#full / 3)
+        local pages, note = ns.Export.RunPages("raid", budget)
+        assert.equals(1, #assert(pages))
+        assert(#pages[1] <= budget, #pages[1] .. " bytes over a " .. budget .. " byte budget")
+        local pulls = decode(pages[1]).payload.data.pulls
+        assert(#pulls > 1 and #pulls < 50, "kept " .. #pulls .. " pulls")
+        assert.equals(1050, pulls[#pulls].encounterId) -- the newest pull is always in
+        local ids = encounterIds(pulls)
+        for i = 2, #ids do assert.equals(ids[i - 1] + 1, ids[i]) end -- a contiguous newest run
+        assert.equals(string.format("The raid export holds the newest %d of 50 pulls, to fit Raid Ledger's size limit.",
+            #pulls), note)
+        -- one more pull would not have fitted
+        LedgerLinkDB.raid = { pulls = seedPulls(50) }
+        local raid = ns.Raid.Build()
+        local payload = ns.Export.BuildPayload("raid", ns.Raid.Newest(raid, #pulls + 1))
+        assert(#ns.Export.Encode("raid", payload) > budget)
+    end)
+
+    it("the per-string limit trims a standalone raid export too", function()
+        LedgerLinkDB.raid = { pulls = seedPulls(50) }
+        ns.Export.MAX_STRING_BYTES = 16 * 1024
+        SlashCmdList.LEDGERLINK("export raid")
+        local text = ns.ExportFrame.GetText()
+        assert(#text <= 16 * 1024)
+        local pulls = decode(text).payload.data.pulls
+        assert.equals(1050, pulls[#pulls].encounterId)
+        assert.truthy(WowStub.printed[#WowStub.printed]:find("holds the newest %d+ of 50 pulls"))
+    end)
+
+    it("fails with the size message when not even one pull fits", function()
+        LedgerLinkDB.raid = { pulls = seedPulls(3) }
+        local pages, err, tooLarge = ns.Export.RunPages("raid", 200)
+        assert.is_nil(pages)
+        assert.truthy(err:find("too large"))
+        assert.is_true(tooLarge)
+    end)
+
+    it("Export all gives the raid what is left of the one paste instead of failing", function()
+        LedgerLinkDB.raid = { pulls = seedPulls(50) }
+        local untrimmed = assert(ns.Export.RunAll())
+        local raidBytes = #untrimmed[#untrimmed]
+        -- a paste limit that fits everything but about half the raid string
+        ns.Export.MAX_PASTE_BYTES = #table.concat(untrimmed, "\n") - math.floor(raidBytes / 2)
+        local tokens, notes = assert(ns.Export.RunAll())
+        local text = table.concat(tokens, "\n")
+        assert(#text <= ns.Export.MAX_PASTE_BYTES)
+        local pulls = decode(tokens[#tokens]).payload.data.pulls
+        assert(#pulls < 50 and #pulls > 1, "kept " .. #pulls .. " pulls")
+        assert.equals(1050, pulls[#pulls].encounterId)
+        assert.truthy(notes[#notes]:find("holds the newest %d+ of 50 pulls"))
+        -- and the logout auto-export stores it, raid included
+        assert.is_true(ns.Outbox.OnLogout())
+        local _, entry = next(LedgerLinkDB.outbox)
+        assert.equals("all", entry.section)
+        assert.truthy(entry.text:find("!RL1!raid!", 1, true))
+    end)
+
+    it("Export all with no room left for a single pull keeps the one-paste message", function()
+        LedgerLinkDB.raid = { pulls = seedPulls(5) }
+        local tokens = assert(ns.Export.RunAll())
+        ns.Export.MAX_PASTE_BYTES = #table.concat(tokens, "\n", 1, #tokens - 1) + 10
+        local none, err = ns.Export.RunAll()
+        assert.is_nil(none)
+        assert.truthy(err:find("too big for one paste"))
     end)
 end)
