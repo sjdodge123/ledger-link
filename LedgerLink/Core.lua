@@ -122,11 +122,12 @@ end
 
 local function showExport(section)
     if inCombat() then return end
-    local pages, err = ns.Export.RunPages(section)
+    local pages, note = ns.Export.RunPages(section)
     if not pages then
-        ns.Print(err)
+        ns.Print(note)
         return
     end
+    if note then ns.Print(note) end
     local bytes = 0
     for _, page in ipairs(pages) do bytes = bytes + #page end
     LedgerLinkDB.lastExport[section] = { at = time(), bytes = bytes, pages = #pages }

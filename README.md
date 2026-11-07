@@ -69,7 +69,10 @@ members, then the most recently seen, and says how many were left out.
 (`ENCOUNTER_START` / `ENCOUNTER_END`): encounter, difficulty, kill or wipe,
 start/end time (unix seconds) and the group roster at the pull (up to 40
 GUIDs + names). The newest **50** pulls are kept in `LedgerLinkDB.raid.pulls`
-(SavedVariables); older ones drop off. There is no damage or DPS data: the
+(SavedVariables); older ones drop off. Every raid export resends the whole
+buffer (Raid Ledger dedupes pulls it already has). If the string would be too
+large for Raid Ledger, it keeps the newest pulls that fit and the chat says how
+many were left out (ROK-2123). There is no damage or DPS data: the
 combat log (`COMBAT_LOG_EVENT_UNFILTERED`) is closed to addons on Forever, so
 Details!/DBM-style log parsing is impossible in-game.
 
@@ -77,8 +80,10 @@ Details!/DBM-style log parsing is impossible in-game.
 the character string, every guild page and the raid string in one box, one per
 line, to paste into Raid Ledger in one go (Raid Ledger ROK-1737, CONTRACT.md
 §5.1). Each string keeps its normal format. No guild or no recorded pulls?
-That section is left out and the chat says so. A paste over Raid Ledger's
-256 KB limit is refused with a hint to export the guild on its own.
+That section is left out and the chat says so. The raid string gets whatever
+room the character and guild strings leave under Raid Ledger's 256 KB limit
+(the oldest pulls go first); if even that is not enough, the paste is refused
+with a hint to export the guild on its own.
 
 **Panel.** `/rl` or the minimap button opens a small window with one
 **Export to Raid Ledger** button (the Export all paste; the per-section exports
