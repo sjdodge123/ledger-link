@@ -6,7 +6,9 @@ local Json = ns.Json
 local Identity = {}
 ns.Identity = Identity
 
-local RULESETS = { normal = true, pvp = true, roleplaying = true, hardcore = true }
+local RULESETS = { normal = true, pvp = true, roleplaying = true, rppvp = true, hardcore = true }
+--- How a ruleset reads in the panel, tooltip and /rl status (the wire value otherwise).
+local RULESET_LABELS = { rppvp = "RP-PvP" }
 local FACTIONS = { Alliance = true, Horde = true, Neutral = true }
 
 --- Call a WoW API that may be missing or throw on a beta build.
@@ -125,12 +127,24 @@ function ns.NormalizeGuid(guid)
     return prefix .. digits .. "-" .. string.upper(hex)
 end
 
---- The client has no realm-type API. C_GameRules.IsHardcoreActive() exists
---- on the WoW: Forever beta (false on PvP and PvE realms; true on Hardcore is
---- UNVERIFIED, see README "Beta unknowns"). Only a real `true` counts.
+--- "RP PvP", "RP-PvP" or "RPPvP" as a whole word somewhere in the realm name
+--- (live realms are named like "CAMWOW US2 Realm 9 RP PvP", Raid Ledger
+--- ROK-2101). Case-insensitive; "Sharpvp" does not match.
+local RPPVP_IN_REALM_NAME = "%f[%w]rp[%s%-]*pvp%f[%W]"
+
+function Identity.IsRpPvpRealmName(name)
+    return type(name) == "string" and string.find(string.lower(name), RPPVP_IN_REALM_NAME) ~= nil
+end
+
+--- The client has no realm-type API in game (the realm list's isRP/isPvP are
+--- glue-screen only). C_GameRules.IsHardcoreActive() exists on the WoW:
+--- Forever beta (false on PvP and PvE realms; true on Hardcore is UNVERIFIED,
+--- see README "Beta unknowns"); only a real `true` counts. RP-PvP is read off
+--- GetRealmName(), the one place the client spells the realm type out.
 local function detectRuleset()
     local rules = C_GameRules
     if type(rules) == "table" and ns.SafeCall(rules.IsHardcoreActive) == true then return "hardcore" end
+    if Identity.IsRpPvpRealmName(ns.SafeCall(GetRealmName)) then return "rppvp" end
     return nil
 end
 
@@ -145,11 +159,12 @@ function Identity.Ruleset()
     return nil
 end
 
---- "pvp", "hardcore (detected)" or "not set", for the panel, tooltip and status.
+--- "pvp", "RP-PvP", "hardcore (detected)" or "not set", for the panel, tooltip and status.
 function Identity.RulesetText()
     local value, source = Identity.Ruleset()
     if not value then return "not set" end
-    return source == "detected" and (value .. " (detected)") or value
+    local text = RULESET_LABELS[value] or value
+    return source == "detected" and (text .. " (detected)") or text
 end
 
 local function ruleset()

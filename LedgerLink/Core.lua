@@ -7,6 +7,8 @@ ns.VERSION = "@project-version@" -- the packager substitutes the release tag (al
 local RULESET_ALIASES = {
     normal = "normal", pvp = "pvp", hardcore = "hardcore", hc = "hardcore",
     roleplaying = "roleplaying", rp = "roleplaying",
+    -- RP-PvP realms (contract v1 2026-11-06, Raid Ledger ROK-2101).
+    rppvp = "rppvp", ["rp-pvp"] = "rppvp", rpvp = "rppvp",
 }
 
 function ns.Print(msg)
@@ -39,7 +41,7 @@ local HELP = {
     "/rl export raid - recorded boss pulls (last 50)",
     "/rl raid clear - forget recorded boss pulls",
     "/rl guildnotes on|off - include public notes in the guild export (default off)",
-    "/rl ruleset normal|pvp|rp|hardcore - set this character's ruleset (Hardcore is detected)",
+    "/rl ruleset normal|pvp|rp|rppvp|hardcore - set this character's ruleset (Hardcore and RP-PvP are detected)",
     "/rl region us|eu|kr|tw|cn - override the region where the game doesn't report one (beta; otherwise guessed from your game language)",
     "/rl status - show the last export times",
     "/rl probe - beta checks in one copyable report (paste it to the addon developer)",
@@ -54,7 +56,8 @@ local function showHelp()
     for _, line in ipairs(HELP) do print("  " .. line) end
 end
 
---- Set this character's ruleset ("normal", "pvp", "rp"/"roleplaying", "hardcore"/"hc").
+--- Set this character's ruleset ("normal", "pvp", "rp"/"roleplaying",
+--- "rppvp"/"rp-pvp"/"rpvp", "hardcore"/"hc").
 function ns.SetRuleset(value)
     local ruleset = RULESET_ALIASES[value or ""]
     if not ruleset then return false end
@@ -66,7 +69,7 @@ end
 local function setRuleset(arg)
     local ok, ruleset = ns.SetRuleset(arg)
     if not ok then
-        ns.Print("Usage: /rl ruleset normal|pvp|rp|hardcore")
+        ns.Print("Usage: /rl ruleset normal|pvp|rp|rppvp|hardcore")
         return
     end
     ns.Print("Ruleset set to " .. ruleset .. ".")

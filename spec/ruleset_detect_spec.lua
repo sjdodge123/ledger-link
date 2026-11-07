@@ -49,6 +49,47 @@ describe("ruleset detection", function()
         assert.equal("pvp", exportRuleset(ns))
     end)
 
+    -- RP-PvP (Raid Ledger ROK-2101): no in-game API marks the realm type, but
+    -- live RP-PvP realms carry it in the name ("CAMWOW US2 Realm 9 RP PvP").
+    it("sends rppvp when the realm name says RP PvP and the player hasn't picked one", function()
+        WowStub.state.realmName = "CAMWOW US2 Realm 9 RP PvP"
+        assert.equal("rppvp", exportRuleset(ns))
+        assert.is_nil(LedgerLinkCharDB.ruleset) -- detected, not saved
+        assert.equal("RP-PvP (detected)", ns.Identity.RulesetText())
+        ns.HandleSlash("probe")
+        assert.truthy(ns.ExportFrame.GetText():find("export sends: RP-PvP (detected)", 1, true))
+    end)
+
+    it("matches RP PvP as a whole word in any spelling, and nothing else", function()
+        local is = ns.Identity.IsRpPvpRealmName
+        for _, name in ipairs({ "Realm 9 RP PvP", "Realm 9 RP-PvP", "Realm 9 RPPvP", "Emerald Dream (RPPVP)",
+            "rp pvp realm", "RP  PvP" }) do
+            assert.is_true(is(name), name)
+        end
+        for _, name in ipairs({ "Classic Beta PvP", "Classic Beta PvE 2", "Tale Spinner", "Sharpvp", "RP PvPx",
+            "Forever", "", nil, 42 }) do
+            assert.is_false(is(name), tostring(name))
+        end
+    end)
+
+    it("sends null on a realm whose name doesn't say RP PvP, or with no realm name", function()
+        WowStub.state.realmName = "Classic Beta PvP"
+        assert.equal(require("dkjson").null, exportRuleset(ns))
+        local getRealmName = _G.GetRealmName
+        _G.GetRealmName = nil
+        assert.equal(require("dkjson").null, exportRuleset(ns))
+        _G.GetRealmName = getRealmName
+    end)
+
+    it("hardcore wins over the realm name, and the player's pick over both", function()
+        WowStub.state.realmName = "Realm 9 RP PvP"
+        _G.C_GameRules = { IsHardcoreActive = function() return true end }
+        assert.equal("hardcore", exportRuleset(ns))
+        _G.C_GameRules = nil
+        ns.HandleSlash("ruleset rp")
+        assert.equal("roleplaying", exportRuleset(ns))
+    end)
+
     it("shows the detected ruleset in the panel, tooltip and /rl status", function()
         _G.C_GameRules = { IsHardcoreActive = function() return true end }
         ns.Panel.Show()
