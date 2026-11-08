@@ -1265,6 +1265,17 @@ end
 Probe.SECTION_BUILDERS = { S3 = s3Lines, S4 = s4Lines, S5 = s5Lines, S6 = s6Lines, S7 = s7Lines, S8 = s8Lines,
     S9 = s9Lines }
 
+--- What the logout auto-export would fall back to (Guild.cache, Char.cache).
+function Probe.CacheLine()
+    local g, c = ns.Guild.cache, ns.Char.cache
+    local guild = "none"
+    if g then
+        guild = string.format("%s, %d members as of %s", g.name, #g.members, date("%H:%M:%S", g.snapshotAt))
+    end
+    return string.format("logout cache: guild = %s; gear = %s; talents = %s", guild,
+        c.gear and (#c.gear .. " items") or "none", c.talents and (#c.talents.nodes .. " nodes") or "none")
+end
+
 --- Plain-text report, one line per check.
 function Probe.Report()
     local lines = {
@@ -1273,6 +1284,7 @@ function Probe.Report()
             tostring(LedgerLinkCharDB and LedgerLinkCharDB.ruleset), ns.Identity.RulesetText(),
             tostring(LedgerLinkDB and LedgerLinkDB.region), #ns.Raid.Pulls()),
     }
+    lines[#lines + 1] = Probe.CacheLine()
     for _, line in ipairs(ns.Blocked.Lines()) do lines[#lines + 1] = line end
     for _, spec in ipairs(CALLS) do lines[#lines + 1] = describeCall(spec) end
     for _, path in ipairs(PRESENCE) do

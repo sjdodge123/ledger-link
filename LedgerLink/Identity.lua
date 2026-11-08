@@ -200,7 +200,8 @@ function Identity.Who()
         race = ns.Clip(raceToken, 32) or "",
         level = level,
         faction = FACTIONS[faction] and faction or "Neutral",
-        guildName = ns.Clip(ns.SafeCall(GetGuildInfo, "player"), 64),
+        -- Live, else the cached roster's name (at logout GetGuildInfo is nil).
+        guildName = ns.Guild and ns.Guild.Name() or ns.Clip(ns.SafeCall(GetGuildInfo, "player"), 64),
         gender = GENDERS[ns.SafeCall(UnitSex, "player") or 0],
     }
 end

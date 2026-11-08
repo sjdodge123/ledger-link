@@ -106,7 +106,9 @@ local function collectMembers(includeNotes)
     return members, skipped, dupes
 end
 
-function Guild.Build()
+-- The roster as read right now; nil + a message when the client can't give it.
+-- `quiet` skips the chat report (the background refresh below).
+local function buildLive(quiet)
     local name, _, _, realm = ns.SafeCall(GetGuildInfo, "player")
     name = ns.Clip(name, 64)
     if not name or name == "" then return nil, "You're not in a guild." end
@@ -117,7 +119,7 @@ function Guild.Build()
     local members, skipped, dupes = collectMembers(includeNotes)
     local omitted
     members, omitted = capMembers(members, ns.NormalizeGuid(ns.SafeCall(UnitGUID, "player")))
-    report(skipped, dupes, omitted)
+    if not quiet then report(skipped, dupes, omitted) end
     if #members == 0 then return nil, "No readable guild members. Please report this." end
     local rawRealm = ns.Clip(realm, 64) or ns.Clip(ns.SafeCall(GetRealmName), 64)
     return {
@@ -127,6 +129,70 @@ function Guild.Build()
         canViewOfficerNote = false, -- always: officer notes are never exported
         members = members,
     }
+end
+
+-- Roster cache for the logout auto-export (Outbox.lua). At PLAYER_LOGOUT the
+-- client has already dropped the guild: GetGuildInfo("player") returns nil and
+-- the roster is empty, so every logout export lost its guild page (2026-11-07).
+-- The last roster read while playing is kept (this session only, in memory)
+-- with its own snapshotAt, and used whenever the live read fails. Leaving the
+-- guild (PLAYER_GUILD_UPDATE while not in one) drops it.
+Guild.cache = nil
+--- Background refreshes on GUILD_ROSTER_UPDATE run at most this often.
+Guild.REFRESH_SECONDS = 10
+local refreshedAt
+-- Between PLAYER_LEAVING_WORLD and PLAYER_ENTERING_WORLD (loading screen or
+-- logout) the guild APIs may read "no guild": that is not leaving it.
+local leavingWorld = false
+
+--- Read the roster quietly and keep it, when the client has one. `force`
+--- skips the REFRESH_SECONDS throttle.
+function Guild.Refresh(force)
+    local now = ns.SafeCall(GetServerTime) or time()
+    if not force and refreshedAt and now - refreshedAt < Guild.REFRESH_SECONDS then return false end
+    local data = buildLive(true)
+    if not data then return false end
+    Guild.cache, refreshedAt = data, now
+    return true
+end
+
+local function inGuildNow()
+    local inGuild = ns.SafeCall(IsInGuild)
+    if inGuild == nil then inGuild = ns.SafeCall(GetGuildInfo, "player") end
+    return inGuild ~= nil and inGuild ~= false
+end
+
+--- The player's guild name: live, else the cached roster's (logout).
+function Guild.Name()
+    local name = ns.Clip(ns.SafeCall(GetGuildInfo, "player"), 64)
+    if name and name ~= "" then return name end
+    return Guild.cache and Guild.cache.name or nil
+end
+
+-- The cached roster as the current /rl guildnotes setting allows: a roster
+-- read with notes on loses them once notes are turned off.
+local function cachedForExport()
+    local cache = Guild.cache
+    if type(LedgerLinkDB) == "table" and LedgerLinkDB.guildNotes == true then return cache end
+    local members = Json.array()
+    for i, m in ipairs(cache.members) do
+        local row = {}
+        for k, v in pairs(m) do if k ~= "note" then row[k] = v end end
+        members[i] = row
+    end
+    return { name = cache.name, rawRealm = cache.rawRealm, snapshotAt = cache.snapshotAt,
+        canViewOfficerNote = false, members = members }
+end
+
+--- The live roster (also refreshing the cache), else the cached one.
+function Guild.Build()
+    local data, err = buildLive(false)
+    if data then
+        Guild.cache, refreshedAt = data, ns.SafeCall(GetServerTime) or time()
+        return data
+    end
+    if Guild.cache then return cachedForExport() end
+    return nil, err
 end
 
 --- Split `data.members` into pages of MEMBERS_PER_PAGE. Every page repeats
@@ -163,16 +229,36 @@ function Guild.Prepare(done)
     ns.Print("The guild roster isn't loaded yet: open the Guild window (J) and the export will open.")
 end
 
-function Guild.OnEvent(event)
-    if event == "GUILD_ROSTER_UPDATE" and pending then
-        local done = pending
-        pending = nil
-        done()
+function Guild.OnEvent(event, unit)
+    if event == "GUILD_ROSTER_UPDATE" then
+        if not leavingWorld then Guild.Refresh(false) end
+        if pending then
+            local done = pending
+            pending = nil
+            done()
+        end
+    elseif event == "PLAYER_GUILD_UPDATE" then
+        if leavingWorld or (unit ~= nil and unit ~= "player") then return end
+        if inGuildNow() then
+            Guild.Refresh(true)
+        else
+            Guild.cache, refreshedAt = nil, nil -- left (or was removed from) the guild
+        end
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        leavingWorld = false
+        Guild.Refresh(true)
+    elseif event == "PLAYER_LEAVING_WORLD" then
+        Guild.Refresh(true) -- the last chance to read it before logout
+        leavingWorld = true
     end
 end
 
 local events = CreateFrame("Frame")
+Guild.frame = events
 events:RegisterEvent("GUILD_ROSTER_UPDATE")
-events:SetScript("OnEvent", function(_, event) Guild.OnEvent(event) end)
+for _, event in ipairs({ "PLAYER_GUILD_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_LEAVING_WORLD" }) do
+    pcall(events.RegisterEvent, events, event)
+end
+events:SetScript("OnEvent", function(_, event, unit) Guild.OnEvent(event, unit) end)
 
 ns.Export.RegisterSection("guild", Guild.Build, { paginate = Guild.Paginate, prepare = Guild.Prepare })

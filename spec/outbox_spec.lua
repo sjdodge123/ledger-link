@@ -103,11 +103,21 @@ describe("Companion outbox", function()
             assert.equal("char", LedgerLinkDB.outbox[GUID].section)
         end)
 
-        it("never replaces this session's clicked Export all with a char-only fallback", function()
+        it("keeps the guild page of this session's clicked Export all when the roster is gone at logout", function()
             ns.HandleSlash("export all")
             WowStub.state.guildRoster = {}
             logout(ns)
-            assert.equal("all", LedgerLinkDB.outbox[GUID].section)
+            local entry = LedgerLinkDB.outbox[GUID]
+            assert.equal("all", entry.section)
+            assert.equal("logout", entry.source)
+            assert.equal("guild", importString(entry.text).groups[2].section)
+        end)
+
+        it("never replaces this session's clicked export with a char-only fallback", function()
+            ns.HandleSlash("export char")
+            ns.Export.RunAll = function() return nil, "Guild export: no roster" end
+            logout(ns)
+            assert.equal("char", LedgerLinkDB.outbox[GUID].section)
             assert.equal("export", LedgerLinkDB.outbox[GUID].source)
         end)
 
