@@ -229,6 +229,16 @@ function Guild.Prepare(done)
     ns.Print("The guild roster isn't loaded yet: open the Guild window (J) and the export will open.")
 end
 
+-- Re-read the roster, or drop the cache when the player is not in a guild
+-- (left or removed from it).
+local function reconcile()
+    if inGuildNow() then
+        Guild.Refresh(true)
+    else
+        Guild.cache, refreshedAt = nil, nil
+    end
+end
+
 function Guild.OnEvent(event, unit)
     if event == "GUILD_ROSTER_UPDATE" then
         if not leavingWorld then Guild.Refresh(false) end
@@ -239,14 +249,12 @@ function Guild.OnEvent(event, unit)
         end
     elseif event == "PLAYER_GUILD_UPDATE" then
         if leavingWorld or (unit ~= nil and unit ~= "player") then return end
-        if inGuildNow() then
-            Guild.Refresh(true)
-        else
-            Guild.cache, refreshedAt = nil, nil -- left (or was removed from) the guild
-        end
+        reconcile()
     elseif event == "PLAYER_ENTERING_WORLD" then
+        -- Also catches a guild left during the loading screen, whose
+        -- PLAYER_GUILD_UPDATE was ignored above.
         leavingWorld = false
-        Guild.Refresh(true)
+        reconcile()
     elseif event == "PLAYER_LEAVING_WORLD" then
         Guild.Refresh(true) -- the last chance to read it before logout
         leavingWorld = true

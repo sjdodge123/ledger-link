@@ -135,6 +135,18 @@ describe("logout export from the play-time cache", function()
         assert.is_table(bySection(logout(ns).text).guild)
     end)
 
+    it("drops the cache on world entry when the guild was left during a loading screen", function()
+        fire(ns, "PLAYER_LEAVING_WORLD")
+        WowStub.state.guild, WowStub.state.guildRoster = nil, {}
+        fire(ns, "PLAYER_GUILD_UPDATE", "player") -- ignored: leaving the world
+        assert.is_table(ns.Guild.cache)
+        fire(ns, "PLAYER_ENTERING_WORLD")
+        assert.is_nil(ns.Guild.cache)
+        assert.is_nil(ns.Guild.Name())
+        clientDropsEverything()
+        assert.is_nil(bySection(logout(ns).text).guild)
+    end)
+
     it("ignores PLAYER_GUILD_UPDATE for other units", function()
         WowStub.state.guild = nil
         fire(ns, "PLAYER_GUILD_UPDATE", "party1")

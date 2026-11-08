@@ -26,3 +26,6 @@ from the same Raid Ledger commit; the same rules apply to it.
   (pcall / nil checks) and list it under "Beta unknowns" in README.md.
 - Before every push: `eval "$(luarocks --lua-version=5.1 path)"`, then
   `busted --lua=luajit` and `luacheck .`.
+- Before opening a PR: `git fetch origin main && codex review --base origin/main`.
+  Fix each finding or say in the PR description why it was left. Run it again
+  on the final diff if the fixes were substantial.
