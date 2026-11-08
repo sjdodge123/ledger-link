@@ -84,6 +84,17 @@ local cases = {
         raidPulls(ns, 2, 40)
     end },
     { name = "all-char-only", section = "all", setup = function() WowStub.state.guild = nil end },
+    -- The logout auto-export: guild roster, gear and talents read while playing,
+    -- then the client drops them at PLAYER_LOGOUT (2026-11-07 bug).
+    { name = "all-logout-from-cache", section = "all", setup = function(ns)
+        raidPulls(ns, 1, 25)
+        ns.Guild.OnEvent("PLAYER_ENTERING_WORLD")
+        ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
+        ns.Guild.OnEvent("PLAYER_LEAVING_WORLD")
+        ns.Char.OnEvent("PLAYER_LEAVING_WORLD")
+        local s = WowStub.state
+        s.guild, s.guildRoster, s.gear, s.talentConfigId = nil, {}, {}, nil
+    end },
     { name = "raid-50-pulls-ring-full", section = "raid", setup = function(ns) raidPulls(ns, 60, 40) end },
     -- ROK-2123: an account whose SavedVariables hold 250 pulls, 40 distinct players each.
     { name = "raid-250-stored-pulls-newest", section = "raid",

@@ -34,9 +34,18 @@ then). One entry per character, latest wins, at most 10 characters:
 `LedgerLinkDB.outbox[<player GUID>] = { exportedAt, section, text, at, source }`,
 where `text` is exactly the copy-box text (a paged export: every page, one per
 line). On logout the addon also stores a fresh Export all by itself
-(`source = "logout"`); if the guild roster never loaded it stores the character
-alone, unless you clicked Export earlier in the session. Turn this off with
-`/rl autoexport off` or the panel checkbox. Pasting works exactly as before.
+(`source = "logout"`). By the time the game sends PLAYER_LOGOUT it has already
+dropped your guild, gear and talents, so the addon keeps the last guild roster,
+gear and talents it read while you played (in memory, this session only:
+refreshed on entering/leaving the world, `GUILD_ROSTER_UPDATE` at most every
+10 s, `PLAYER_GUILD_UPDATE`, `PLAYER_EQUIPMENT_CHANGED` and talent changes) and
+the logout export uses them when the live read is empty. The guild page keeps
+the `snapshotAt` of when the roster was read. Leaving the guild drops the cached
+roster; an empty gear or talent read never replaces a cached one. If the roster
+never loaded this session it stores the character alone, unless you clicked
+Export earlier in the session. `/rl probe` shows what is cached (`logout
+cache:` line). Turn this off with `/rl autoexport off` or the panel checkbox.
+Pasting works exactly as before.
 
 **Dev snapshot (`/rl dev`, developers only).** Off by default; nothing is written
 until you type `/rl dev on`. While it is on, every logout or `/reload` stores one
@@ -267,6 +276,9 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `GetNumGuildMembers()` counts offline members | returns two values, `32, 24` (total, online) with the Guild window open (probe, 2026-10-05); checklist step 5 | offline members missing unless the Guild window shows them |
 | `GetGuildRosterInfo(i)` return order (name 1, rank 2, rankIndex 3, level 4, note 7, online 9, class token 11, GUID 17) | **confirmed**, 17 returns (probe, 2026-10-05) | rows "unreadable and skipped"; the officer note (slot 8) is never read either way |
 | Roster names are `"First Surname-<realm>"` | **no realm suffix** on the beta: `"First Surname"` (probe, 2026-10-05) | exported raw; Raid Ledger strips the suffix |
+| Logout state: at `PLAYER_LOGOUT` `GetGuildInfo("player")` is nil, the roster is empty and `GetInventoryItemLink`/`C_ClassTalents` return nothing | **confirmed** from the operator's SavedVariables (every 2026-11-07 logout export: no guild page, `gear: []`, empty talents); the logout export now uses the play-time cache. Check: log out, then the Companion's outbox entry (`source = "logout"`) has a `!RL1!guild` page and non-empty gear | no guild page / empty gear at logout (as before) |
+| `PLAYER_GUILD_UPDATE` + `IsInGuild()` on leaving a guild; `PLAYER_LEAVING_WORLD` before `PLAYER_LOGOUT` | leave a guild, log out: the logout export has no guild page. A no-guild `PLAYER_GUILD_UPDATE` after `PLAYER_LEAVING_WORLD` (teardown) is ignored; membership is checked again on `PLAYER_ENTERING_WORLD` | a left guild's roster is sent once more at logout (if leaving isn't seen); the cache dropped at logout (if the order differs) |
+| `TRAIT_CONFIG_UPDATED`, `PLAYER_TALENT_UPDATE` (registered under pcall) | change a talent, log out at once: the logout export has the new talents | talents as of the last world entry / loading screen |
 | `GetGuildRosterLastOnline(i)` (years, months, days) | returns nothing for an online member, as expected (probe, 2026-10-05); offline members still to check in the preview | `lastOnlineDays` omitted |
 | `GetGuildInfo("player")` 4th return (realm) | **confirmed**: `"ClassicBetaPvP2"`, which differs from `GetRealmName()` (probe, 2026-10-05) | `rawRealm` falls back to `GetRealmName()` |
 | `ENCOUNTER_START` / `ENCOUNTER_END` fire with IDs on Forever (E5) | `/rl raid` after a boss | no pulls recorded |

@@ -188,13 +188,69 @@ function Char.Quests()
     return quests
 end
 
+-- Gear + talents cache for the logout auto-export (Outbox.lua). At
+-- PLAYER_LOGOUT the inventory and talent APIs already return nothing, so every
+-- logout export sent `gear: []` and empty talents (2026-11-07). The last
+-- non-empty read while playing is kept (this session only, in memory) and used
+-- when the live read comes back empty. An empty read never replaces it: Raid
+-- Ledger treats an empty gear list as "nothing to store" anyway.
+Char.cache = {}
+
+-- Nodes, not just a config id: a config id with no readable nodes is the
+-- trait APIs not answering yet, and must not replace a populated cache.
+local function hasTalents(t)
+    return type(t) == "table" and #t.nodes > 0
+end
+
+--- Live gear, kept in the cache; the cached gear when the live read is empty.
+function Char.GearOrCached()
+    local gear = Char.Gear()
+    if #gear > 0 then
+        Char.cache.gear = gear
+        return gear
+    end
+    return Char.cache.gear or gear
+end
+
+--- Live talents, kept in the cache; the cached talents when the live read is empty.
+function Char.TalentsOrCached()
+    local talents = Char.Talents()
+    if hasTalents(talents) then
+        Char.cache.talents = talents
+        return talents
+    end
+    return Char.cache.talents or talents
+end
+
 function Char.Build()
     return {
-        gear = Char.Gear(),
-        talents = Char.Talents(),
+        gear = Char.GearOrCached(),
+        talents = Char.TalentsOrCached(),
         lockouts = Char.Lockouts(),
         quests = Char.Quests(),
     }
 end
+
+-- Refresh the cache on the events where the APIs answer. TRAIT_CONFIG_UPDATED
+-- and PLAYER_TALENT_UPDATE may not exist on Forever: registered under pcall.
+local REFRESH = {
+    PLAYER_ENTERING_WORLD = { gear = true, talents = true },
+    PLAYER_LEAVING_WORLD = { gear = true, talents = true }, -- the last read before logout
+    PLAYER_EQUIPMENT_CHANGED = { gear = true },
+    TRAIT_CONFIG_UPDATED = { talents = true },
+    PLAYER_TALENT_UPDATE = { talents = true },
+}
+
+function Char.OnEvent(event)
+    local what = REFRESH[event]
+    if not what then return end
+    if what.gear then Char.GearOrCached() end
+    if what.talents then Char.TalentsOrCached() end
+end
+
+local events = CreateFrame("Frame")
+Char.frame = events
+for event in pairs(REFRESH) do pcall(events.RegisterEvent, events, event) end
+events:SetScript("OnEvent", function(_, event) Char.OnEvent(event) end)
 
 ns.Export.RegisterSection("char", Char.Build)

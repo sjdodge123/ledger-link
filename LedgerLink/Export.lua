@@ -199,7 +199,9 @@ function Export.RunAll()
     local char, charErr = Export.RunPages("char")
     if not char then return nil, charErr end
     tokens[1] = char[1]
-    if ns.SafeCall(GetGuildInfo, "player") then
+    -- Guild.Name() falls back to the roster cached while playing: at
+    -- PLAYER_LOGOUT GetGuildInfo("player") already returns nil.
+    if ns.Guild.Name() then
         local guild, guildErr = Export.RunPages("guild")
         if not guild then return nil, "Guild export: " .. tostring(guildErr) end
         for _, page in ipairs(guild) do tokens[#tokens + 1] = page end

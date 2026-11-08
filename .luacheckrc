@@ -15,7 +15,7 @@ read_globals = {
     -- identity / client
     "GetBuildInfo", "GetCurrentRegion", "GetLocale", "GetRealmName", "GetServerTime",
     "GetUnitName", "UnitName", "UnitFullName", "UnitGUID", "UnitClass", "UnitRace",
-    "UnitLevel", "UnitFactionGroup", "GetGuildInfo", "InCombatLockdown",
+    "UnitLevel", "UnitFactionGroup", "GetGuildInfo", "IsInGuild", "InCombatLockdown",
     -- char section
     "GetInventoryItemLink", "GetInventoryItemID", "C_Item", "C_ClassTalents", "C_Traits",
     -- char section, Phase 2 (ROK-1742): talent names, gender, quests
