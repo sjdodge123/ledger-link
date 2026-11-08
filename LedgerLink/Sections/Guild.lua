@@ -162,11 +162,22 @@ local function inGuildNow()
     return inGuild ~= nil and inGuild ~= false
 end
 
---- The player's guild name: live, else the cached roster's (logout).
-function Guild.Name()
+local function liveName()
     local name = ns.Clip(ns.SafeCall(GetGuildInfo, "player"), 64)
     if name and name ~= "" then return name end
-    return Guild.cache and Guild.cache.name or nil
+    return nil
+end
+
+-- The client names a different guild than the cached roster's: the player
+-- changed guilds, so the cached roster is someone else's.
+local function dropOtherGuild()
+    local live = liveName()
+    if Guild.cache and live and live ~= Guild.cache.name then Guild.cache, refreshedAt = nil, nil end
+end
+
+--- The player's guild name: live, else the cached roster's (logout).
+function Guild.Name()
+    return liveName() or (Guild.cache and Guild.cache.name) or nil
 end
 
 -- The cached roster as the current /rl guildnotes setting allows: a roster
@@ -191,6 +202,7 @@ function Guild.Build()
         Guild.cache, refreshedAt = data, ns.SafeCall(GetServerTime) or time()
         return data
     end
+    dropOtherGuild()
     if Guild.cache then return cachedForExport() end
     return nil, err
 end
@@ -233,6 +245,7 @@ end
 -- (left or removed from it).
 local function reconcile()
     if inGuildNow() then
+        dropOtherGuild() -- the new guild's roster may not have loaded yet
         Guild.Refresh(true)
     else
         Guild.cache, refreshedAt = nil, nil

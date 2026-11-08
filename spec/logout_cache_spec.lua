@@ -147,6 +147,23 @@ describe("logout export from the play-time cache", function()
         assert.is_nil(bySection(logout(ns).text).guild)
     end)
 
+    it("drops the old roster when the client names another guild whose roster hasn't loaded", function()
+        fire(ns, "PLAYER_LEAVING_WORLD")
+        WowStub.state.guild, WowStub.state.guildRoster = "Day Shift", {}
+        fire(ns, "PLAYER_ENTERING_WORLD")
+        assert.is_nil(ns.Guild.cache)
+        assert.equal("Day Shift", ns.Guild.Name())
+        local pages, err = ns.Export.RunPages("guild")
+        assert.is_nil(pages)
+        assert.truthy(err:find("hasn't loaded", 1, true))
+    end)
+
+    it("never exports another guild's cached roster, even without an event", function()
+        WowStub.state.guild, WowStub.state.guildRoster = "Day Shift", {}
+        assert.is_nil(ns.Export.RunPages("guild"))
+        assert.is_nil(ns.Guild.cache)
+    end)
+
     it("ignores PLAYER_GUILD_UPDATE for other units", function()
         WowStub.state.guild = nil
         fire(ns, "PLAYER_GUILD_UPDATE", "party1")
@@ -206,6 +223,16 @@ describe("logout export from the play-time cache", function()
         fire(ns, "PLAYER_LEAVING_WORLD")
         assert.equal(2, #ns.Char.cache.gear)
         assert.equal(7, ns.Char.cache.talents.configId)
+    end)
+
+    it("a config id with no readable nodes never replaces cached talents", function()
+        WowStub.state.talentConfigId, WowStub.state.talentTrees = 9, {}
+        fire(ns, "TRAIT_CONFIG_UPDATED", 9)
+        assert.equal(7, ns.Char.cache.talents.configId)
+        clientDropsEverything()
+        local talents = bySection(logout(ns).text).char.payloads[1].data.talents
+        assert.equal(7, talents.configId)
+        assert.equal(3, #talents.nodes)
     end)
 
     it("talent changes refresh the cached talents", function()

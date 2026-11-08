@@ -196,8 +196,10 @@ end
 -- Ledger treats an empty gear list as "nothing to store" anyway.
 Char.cache = {}
 
+-- Nodes, not just a config id: a config id with no readable nodes is the
+-- trait APIs not answering yet, and must not replace a populated cache.
 local function hasTalents(t)
-    return type(t) == "table" and (t.configId ~= nil or #t.nodes > 0)
+    return type(t) == "table" and #t.nodes > 0
 end
 
 --- Live gear, kept in the cache; the cached gear when the live read is empty.
