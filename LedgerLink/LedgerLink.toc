@@ -7,6 +7,7 @@
 ## IconTexture: Interface\AddOns\LedgerLink\Textures\Icon
 ## SavedVariables: LedgerLinkDB
 ## SavedVariablesPerCharacter: LedgerLinkCharDB
+## OptionalDeps: Mailworthy
 
 Core.lua
 Blocked.lua
@@ -15,6 +16,7 @@ Identity.lua
 Export.lua
 Outbox.lua
 TalentGrid.lua
+Mailworthy.lua
 UI.lua
 ExportFrame.lua
 Probe.lua

@@ -102,6 +102,7 @@ function WowStub.reset()
     _G.LedgerLinkDB, _G.LedgerLinkCharDB = nil, nil
     _G.C_GameRules = nil -- tests that need it set their own
     _G.UnitSex, _G.C_QuestLog, _G.C_Spell = nil, nil, nil
+    _G.MailworthyAPI = nil -- the Mailworthy addon: absent unless a test installs it
     if _G.C_Traits then _G.C_Traits.GetEntryInfo, _G.C_Traits.GetDefinitionInfo = nil, nil end
     if _G.Enum then _G.Enum.GameRule = nil end
 end

@@ -228,6 +228,7 @@ function Char.Build()
         talents = Char.TalentsOrCached(),
         lockouts = Char.Lockouts(),
         quests = Char.Quests(),
+        mailworthy = ns.Mailworthy.Block(), -- nil (no key) without Mailworthy or a guild
     }
 end
 

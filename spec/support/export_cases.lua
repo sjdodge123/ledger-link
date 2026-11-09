@@ -5,6 +5,17 @@
 local loadAddon = require("spec.support.load_addon")
 local seedPulls = require("spec.support.seed_pulls")
 
+-- The Mailworthy addon's API returning a golden fixture's block
+-- (contract/v1/fixtures/<name>.json, payload.mailworthy); returns the block.
+local function mailworthyFixture(name)
+    local dkjson = require("dkjson")
+    local f = assert(io.open("contract/v1/fixtures/" .. name .. ".json"))
+    local block = assert(dkjson.decode(f:read("*a")).payload.mailworthy, name .. " has no mailworthy block")
+    f:close()
+    _G.MailworthyAPI = { v1 = { GetGuildExport = function() return block end } }
+    return block
+end
+
 local function raidPulls(ns, count, raidSize)
     WowStub.raid(raidSize)
     for i = 1, count do
@@ -68,6 +79,14 @@ local cases = {
             end,
         }
     end },
+    -- ROK-2148: the Mailworthy guild contributions block, from the golden fixtures.
+    { name = "char-mailworthy", section = "char", setup = function() mailworthyFixture("char-mailworthy") end },
+    { name = "char-mailworthy-template-only", section = "char",
+        setup = function() mailworthyFixture("char-mailworthy-template-only") end },
+    { name = "all-char-mailworthy-guild-raid", section = "all", setup = function(ns)
+        mailworthyFixture("char-mailworthy")
+        raidPulls(ns, 1, 25)
+    end },
     { name = "guild-small-single-page", section = "guild", setup = function() end },
     { name = "guild-notes-on", section = "guild", setup = function(ns) ns.HandleSlash("guildnotes on") end },
     { name = "guild-600-3pages", section = "guild", reversed = true,
@@ -114,4 +133,4 @@ local function run(case)
     return assert(ns.Export.RunPages(case.section))
 end
 
-return { cases = cases, run = run }
+return { cases = cases, run = run, mailworthyFixture = mailworthyFixture }
