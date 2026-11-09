@@ -91,12 +91,23 @@ describe("contract/v1", function()
         if not valid then return nil, "INVALID_PAYLOAD" end
         for i, payload in ipairs(payloads) do
             if payload.section ~= pageSections[i] then return nil, "INVALID_PAYLOAD" end
+            -- The server's one mailworthy rule JSON Schema can't state (ROK-2148):
+            -- a giver's asOf is never after the block's generatedAt.
+            local mw = payload.section == "char" and payload.data.mailworthy or nil
+            for _, g in ipairs(type(mw) == "table" and mw.givers or {}) do
+                if g.asOf > mw.generatedAt then return nil, "INVALID_PAYLOAD" end
+            end
         end
         return result
     end
 
+    -- The decoded view lifts char `data.mailworthy` beside `data` (ROK-2148:
+    -- guild-level data, never stored in the char snapshot).
     local function merged(group)
         local first = group.payloads[1]
+        if first.section == "char" and first.data.mailworthy ~= nil then
+            first.mailworthy, first.data.mailworthy = first.data.mailworthy, nil
+        end
         if first.section ~= "guild" then return first end
         local members = {}
         for _, p in ipairs(group.payloads) do

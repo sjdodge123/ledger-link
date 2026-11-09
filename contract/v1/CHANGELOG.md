@@ -3,6 +3,76 @@
 Newest first. Every entry states **additive** or **breaking** (see
 `CONTRACT.md` → Versioning). Only a Raid Ledger PR may add an entry.
 
+## v1 — 2026-11-09 — `char` `mailworthy` guild contributions block — **additive**
+
+- The `char` section's `data` gains one **optional** key, `mailworthy`
+  (ROK-2148; stays v1): what the Mailworthy addon knows about the exporter's
+  guild — `generatedAt`, the guild template `{ rev, author, rules[] ≤ 8 of
+  { professionSkillLineId, recipientName } }` (per-unit caps are never sent),
+  `peers[] ≤ 1000 { name, lastSeenAt }` (guild members whose Mailworthy said
+  hello in the last 60 days) and `givers[] ≤ 200 { characterName,
+  itemsAllTime, countingSince, asOf, days[] ≤ 35 { day, items } }` —
+  guild-rule item units sent per character, per UTC day, for the
+  exporter's account AND guildmates whose totals Mailworthy shared in the
+  guild hellos (operator ruling 2026-11-08). `asOf` (required, unix
+  seconds, `≤ generatedAt`) = when the giver's own client computed them.
+  `template.rules` may be `[]` (template published with no rules). Every
+  object is `.strict()`; names ≤ 48.
+- Semantics: an absent block, template, `peers` or `givers` = no opinion;
+  nothing stored is cleared. Account-wide data exported by several alts is
+  deduped server-side (template by `rev`, peers by name, givers by guild +
+  sending character, newest `asOf`, tie → newer `generatedAt`). Item counts are stack units of guild-rule mail
+  only; mail to one of the sender's own characters never counts.
+- The decoded fixture view carries the block as `payload.mailworthy`, beside
+  the frozen snapshot `payload.data` (it is guild-level data, never stored in
+  the char snapshot).
+- New golden fixtures `char-mailworthy`, `char-mailworthy-template-only`;
+  invalid fixtures `invalid/char-mailworthy-rule-cap`,
+  `invalid/char-mailworthy-too-many-rules`. Every existing fixture
+  unchanged byte-for-byte. `schema.json` regenerated.
+- A server without this change rejects a char export carrying `mailworthy`
+  with 422 `INVALID_PAYLOAD`. LedgerLink must not emit it until a server
+  carrying this change is deployed.
+
+## v1 — 2026-11-08 — `char` `quests.completed` optional — **additive**
+
+- `data.quests.completed` becomes optional (ROK-2125, operator ruling
+  2026-11-07); stays v1. `quests` keeps `.strict()`; `inProgress` stays
+  required; the 10 000-id cap and `completedTruncated` are unchanged.
+  `schema.json` regenerated (`completed` dropped from the `quests` `required`
+  list only).
+- Semantics: **absent** = no opinion — the server takes the completed list
+  (with its truncation flag and date) from the Forever Armory
+  `quests/completed` sync, and an import that omits it keeps the completed
+  list already stored for the character. **Empty** (`[]`) keeps its meaning:
+  the character has completed no quests.
+- New golden fixture `char-forever-quests-log-only` (the quest log, no
+  `completed` key). Every existing fixture unchanged byte-for-byte.
+- A server without this change rejects a `quests` without `completed` with
+  422 `INVALID_PAYLOAD`. The addon must keep sending `completed` until a
+  server carrying this change is deployed.
+
+## v1 — 2026-11-08 — guild in-game MOTD + Guild Information — **additive**
+
+- The `guild` section's `data` gains two **optional** keys (ROK-2137, guild
+  text sync P1; stays v1): `motd` (≤ 255) — the in-game Message of the Day —
+  and `infoText` (≤ 499) — the in-game Guild Information, both verbatim
+  (colour codes and newlines kept). `""` reports an empty box; an absent key
+  means "no opinion" and never clears what the server stored. Both are
+  guild-visible text; officer notes are still never read or sent.
+- `schema.json` regenerated (two optional string properties). New golden
+  fixture `guild-ingame-text` (one page, three anonymised members, both keys
+  set). Every existing fixture unchanged byte-for-byte.
+- The server stores the last reported text per guild (control characters the
+  hub's save rejects stripped) stamped with min(`snapshotAt`, server receive
+  time), plus the exporter's `who.fullName`. A field moves only when its text
+  CHANGED and the snapshot is not older than the stored one, so re-exporting
+  the same text keeps the stamp; an older snapshot never overwrites a newer
+  report, and an export the roster-replace guard flags stores no text. A server
+  without this change rejects either key with 422 `INVALID_PAYLOAD` (strict
+  keys), so the addon must not send them until a server carrying this change
+  is deployed.
+
 ## v1 — 2026-11-06 — rppvp ruleset — **additive**
 
 - `who.ruleset` gains `rppvp` (RP-PvP realms, ROK-2101); stays v1. Every

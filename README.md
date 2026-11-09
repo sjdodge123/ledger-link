@@ -198,6 +198,19 @@ the `tree`/`row`/`col` hint from `TalentGrid.lua` (CONTRACT.md §3), and
 to 10 objectives each (`text`, `done`, `have`, `need`). A level-8 character's
 `char` string grows from about 0.7 KB to 2.6 KB.
 
+**Mailworthy guild contributions (Raid Ledger ROK-2148).** When the
+[Mailworthy](https://github.com/sjdodge123/mailworthy) addon is installed
+(`## OptionalDeps: Mailworthy`, load order only), the `char` section carries
+`data.mailworthy` (CONTRACT.md §3.1): the guild template (profession masters),
+Mailworthy users in the guild and the guild-rule items each character mailed,
+from `MailworthyAPI.v1.GetGuildExport(<guild name>)`. The guild name is the one
+cached while playing, so the logout export still has it. `Mailworthy.lua`
+rebuilds the block from the keys the contract knows, with its caps (names ≤ 48
+characters, dropped and never shortened; rules ≤ 8; peers ≤ 1000, newest first;
+givers ≤ 200; days ≤ 35, newest), so a newer Mailworthy can't break the string.
+No Mailworthy, no guild, a nil result or an error leaves the key out. A full
+block adds about 40 KB to the `char` string.
+
 JSON is produced by the addon's own encoder (`Json.lua`) so empty lists encode
 as `[]` and an unknown ruleset as `null`; `C_EncodingUtil` does the zlib
 compression and base64.
@@ -293,6 +306,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | Gamepad "More" menu on a bag slot (Triangle; 2026-10-13, for a second addon's "Lock slot" entry) | the `S7 …` lines of `/rl probe`: context-action labels (`CONTEXT_ACTION_…`), context/menu mixins, the `Menu` / `MenuUtil` API (`Menu.ModifyMenu`), and every menu opened since login (method, owner frame, tag, entry texts). **Press Triangle on a bag item and open its menu before running the probe** | discovery only; the recorder is a post-hook that reads the menu and never changes it |
 | Auction house deposits (2026-10-13, for a second addon) | the `S8 …` lines of `/rl probe`, run **with the auction house open**: for each tradeable bag stack (commodity or item), the deposit for 12h / 24h / 48h, whole stack and one unit (`C_AuctionHouse.CalculateItemDeposit` / `CalculateCommodityDeposit`) next to its vendor price | calculations only; nothing is posted |
 | Professions (2026-10-22, Raid Ledger ROK-1907 `char.professions`) | the `S9 …` lines of `/rl probe`, run on a character that has at least one profession: `GetProfessions()` slots and `GetProfessionInfo(index)` (name, skill, max, skillLine), `C_TradeSkillUI.GetProfessionInfoBySkillLineID(skillLine)`, and every `C_SkillInfo.GetSkillLineInfo` line (professions marked by SkillLine ID). One `S9 verdict: YES via <source>: Mining 75/150, …` line per source that worked, or `S9 verdict: NO` | discovery only; nothing is exported until Raid Ledger adds the field to the contract. Never expands a skill header |
+| `MailworthyAPI.v1.GetGuildExport(guildName)` (the Mailworthy addon, v0.31.0+; not a WoW API) | with Mailworthy installed and a guild template published, `/rl export char` and Raid Ledger's import preview: the guild hub's Guild contributions widget fills in after the import. Also at logout (the Companion outbox entry) | called under `pcall`; any problem leaves `data.mailworthy` out and the rest of the export is unchanged |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
 
 ## Releases
@@ -307,3 +321,8 @@ packager replaces with the tag (the layout check fails if any keyword is left).
 CurseForge uploads are on (project 1728299, `CF_API_KEY` secret). Wago stays off
 until the `WAGO_API_TOKEN` secret and a `## X-Wago-ID` .toc line exist.
 Listing artwork and copy live in `media/` (not packaged).
+
+**Release gate (ROK-2148):** a Raid Ledger server without ROK-2148 rejects a
+`char` string carrying `data.mailworthy` with 422 `INVALID_PAYLOAD`. Don't tag a
+release that emits it until sjdodge123/Raid-Ledger#2028 is merged **and** deployed to
+prod; confirm with the operator first.

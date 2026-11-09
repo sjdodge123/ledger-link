@@ -23,6 +23,8 @@ read_globals = {
     "GetNumSavedInstances", "GetSavedInstanceInfo",
     -- guild section
     "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "C_GuildInfo",
+    -- char section, Mailworthy guild contributions (ROK-2148; the Mailworthy addon's API)
+    "MailworthyAPI",
     -- raid section
     "GetNumGroupMembers", "IsInRaid", "GetInstanceInfo",
     -- encoding
@@ -39,7 +41,8 @@ read_globals = {
 files["spec/**"] = {
     std = "+busted",
     globals = { "WowStub", "print", "unpack", "time", "date", "UISpecialFrames", "UIParent", "ChatFontNormal",
-        "CreateFrame", "Enum", "C_EncodingUtil", "C_Item", "C_ClassTalents", "C_Traits" },
+        "CreateFrame", "Enum", "C_EncodingUtil", "C_Item", "C_ClassTalents", "C_Traits",
+        "MailworthyAPI" },
     allow_defined_top = true,
 }
 files["tools/**"] = { globals = { "WowStub" } }
