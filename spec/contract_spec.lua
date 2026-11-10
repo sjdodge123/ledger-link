@@ -101,12 +101,19 @@ describe("contract/v1", function()
         return result
     end
 
-    -- The decoded view lifts char `data.mailworthy` beside `data` (ROK-2148:
-    -- guild-level data, never stored in the char snapshot).
+    -- The decoded view lifts char `data.mailworthy` (ROK-2148) and
+    -- `data.addons` (ROK-2147) beside `data`: neither is stored in the char
+    -- snapshot.
     local function merged(group)
         local first = group.payloads[1]
-        if first.section == "char" and first.data.mailworthy ~= nil then
-            first.mailworthy, first.data.mailworthy = first.data.mailworthy, nil
+        if first.section == "char" then
+            for _, key in ipairs({ "mailworthy", "addons" }) do
+                if first.data[key] ~= nil then first[key], first.data[key] = first.data[key], nil end
+            end
+            -- The server sanitizer strips colour codes from addon titles (ROK-2147).
+            for _, a in ipairs(first.addons or {}) do
+                if a.title then a.title = a.title:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") end
+            end
         end
         if first.section ~= "guild" then return first end
         local members = {}
