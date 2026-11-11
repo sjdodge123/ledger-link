@@ -52,6 +52,10 @@ local function defaultState()
         },
         lastOnline = {},
         rosterRequests = 0,
+        -- The in-game Message of the Day / Guild Information boxes (the text of
+        -- contract/v1/fixtures/guild-ingame-text). nil = the read fails.
+        guildMotd = "Raid Thursday 20:00 server time - |cffff8000Molten Core|r. Bring fire resist!",
+        guildInfoText = "Night Shift is a casual Forever guild.\nRaids: Thu + Sun 20:00.\nLoot: loot council, see the hub.",
         -- raid / group
         inRaid = false,
         numGroupMembers = 0,
@@ -145,7 +149,18 @@ _G.GetAddOnMetadata = function(_, field) if field == "Interface" then return s()
 _G.GetNumGuildMembers = function() return #s().guildRoster, 0, 0 end
 _G.GetGuildRosterInfo = function(i) local r = s().guildRoster[i] if r then return unpack(r, 1, 17) end end
 _G.GetGuildRosterLastOnline = function(i) return unpack(s().lastOnline[i] or { 0, 0, 2, 5 }, 1, 4) end
-_G.C_GuildInfo = { GuildRoster = function() s().rosterRequests = s().rosterRequests + 1 end }
+-- A box the client can't read raises, as a restricted API does.
+local function guildBox(key)
+    return function()
+        if s()[key] == nil then error("guild text unavailable") end
+        return s()[key]
+    end
+end
+_G.C_GuildInfo = {
+    GuildRoster = function() s().rosterRequests = s().rosterRequests + 1 end,
+    GetMOTD = guildBox("guildMotd"),
+    GetInfoText = guildBox("guildInfoText"),
+}
 _G.GetNumGroupMembers = function() return s().numGroupMembers end
 _G.IsInRaid = function() return s().inRaid end
 _G.GetInstanceInfo = function() return unpack(s().instance, 1, 8) end

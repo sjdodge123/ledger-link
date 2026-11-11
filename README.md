@@ -74,6 +74,16 @@ paste them all into the one Raid Ledger import box, in any order, separated by
 a newline or space. A guild of more than 2000 members keeps you, then online
 members, then the most recently seen, and says how many were left out.
 
+The guild export also carries the guild's in-game **Message of the Day**
+(`motd`, at most 255 UTF-16 units) and **Guild Information** (`infoText`, at
+most 499), exactly as the game holds them (colour codes and newlines kept), so
+Raid Ledger can tell officers when they changed in game (ROK-2137). An empty
+box is sent as `""`. A box the addon could not read is left out, which Raid
+Ledger reads as "no opinion" and keeps what it had. Both are read with
+`C_GuildInfo.GetMOTD()` / `C_GuildInfo.GetInfoText()` (falling back to the
+pre-12.0 `GetGuildRosterMOTD()` / `GetGuildInfoText()`), kept with the cached
+roster for the logout export, and sent on page 1 of a paged roster.
+
 **Raid export.** While the addon is loaded it records every boss pull
 (`ENCOUNTER_START` / `ENCOUNTER_END`): encounter, difficulty, kill or wipe,
 start/end time (unix seconds) and the group roster at the pull (up to 40
@@ -162,8 +172,9 @@ Open an issue with:
 - what you typed and what happened;
 - the export string (char: your name, gear, talents and lockouts; guild: the
   roster's names, ranks, levels, classes, online state and - only if you ran
-  `/rl guildnotes on` - public notes; raid: boss pulls and who was in the
-  group. Never officer notes, never account data), or
+  `/rl guildnotes on` - public notes, plus the guild's Message of the Day and
+  Guild Information; raid: boss pulls and who was in the group. Never officer
+  notes, never account data), or
 - the Lua error text: `/console scriptErrors 1`, reproduce, then copy the error
   popup;
 - the client build: `/dump GetBuildInfo()`.
@@ -176,7 +187,8 @@ Open an issue with:
 ```
 
 Every page of one guild export repeats the same envelope (`exportedAt`, `who`)
-and the same `name` / `rawRealm` / `snapshotAt`; only `members` is split. The
+and the same `name` / `rawRealm` / `snapshotAt`; only `members` is split, and
+`motd` / `infoText` ride on page 1. The
 server sorts pages by number and refuses a set from different exports, a
 missing page or a member listed twice. The whole paste must stay under the
 server's 256 KB limit; the addon refuses anything bigger.
@@ -293,6 +305,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `PLAYER_GUILD_UPDATE` + `IsInGuild()` on leaving a guild; `PLAYER_LEAVING_WORLD` before `PLAYER_LOGOUT` | leave a guild, log out: the logout export has no guild page. A no-guild `PLAYER_GUILD_UPDATE` after `PLAYER_LEAVING_WORLD` (teardown) is ignored; membership is checked again on `PLAYER_ENTERING_WORLD` | a left guild's roster is sent once more at logout (if leaving isn't seen); the cache dropped at logout (if the order differs) |
 | `TRAIT_CONFIG_UPDATED`, `PLAYER_TALENT_UPDATE` (registered under pcall) | change a talent, log out at once: the logout export has the new talents | talents as of the last world entry / loading screen |
 | `GetGuildRosterLastOnline(i)` (years, months, days) | returns nothing for an online member, as expected (probe, 2026-10-05); offline members still to check in the preview | `lastOnlineDays` omitted |
+| `C_GuildInfo.GetMOTD()` / `C_GuildInfo.GetInfoText()` (guild export `motd` / `infoText`, ROK-2137) | Blizzard's own Forever Guild window calls both (UI source, builds 70009 and 70205); the pre-12.0 globals `GetGuildRosterMOTD` / `GetGuildInfoText` exist only as aliases when the `loadDeprecationFallbacks` CVar is on. The API docs mark both `HasRestrictions`. **Unverified in game from addon code**: `/rl probe` lists all four under presence and the `logout cache:` line says what was read (`motd 77 bytes` / `motd unread`). Also check both are loaded whenever the roster is (a read before the guild data arrives could return `""`) | the key is left out (missing API, an error, a non-string or a secret value); Raid Ledger keeps what it stored |
 | `GetGuildInfo("player")` 4th return (realm) | **confirmed**: `"ClassicBetaPvP2"`, which differs from `GetRealmName()` (probe, 2026-10-05) | `rawRealm` falls back to `GetRealmName()` |
 | `ENCOUNTER_START` / `ENCOUNTER_END` fire with IDs on Forever (E5) | `/rl raid` after a boss | no pulls recorded |
 | `UnitGUID("raidN")` / `GetUnitName` readable during an encounter (secret values, E5) | roster count in the raid preview | roster re-read at `ENCOUNTER_END`; empty roster if both are secret |

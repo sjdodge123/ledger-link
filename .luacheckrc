@@ -22,7 +22,7 @@ read_globals = {
     "C_Spell", "GetSpellInfo", "UnitSex", "C_QuestLog",
     "GetNumSavedInstances", "GetSavedInstanceInfo",
     -- guild section
-    "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "C_GuildInfo",
+    "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "C_GuildInfo", "issecretvalue",
     -- char section, Mailworthy guild contributions (ROK-2148; the Mailworthy addon's API)
     "MailworthyAPI",
     -- raid section

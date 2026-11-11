@@ -34,6 +34,28 @@ function ns.Clip(s, max)
     return string.sub(s, 1, math.max(cut, 0))
 end
 
+--- Truncate a string to at most `max` UTF-16 code units (how the contract
+--- counts a string's length) without splitting a UTF-8 character; nil for
+--- anything that isn't a string. A 4-byte character is 2 units, any other 1.
+function ns.ClipUtf16(s, max)
+    if type(s) ~= "string" then return nil end
+    if #s <= max then return s end -- a unit is never less than a byte
+    local units, i, len = 0, 1, #s
+    while i <= len do
+        local lead = s:byte(i)
+        local size = lead >= 0xF0 and 4 or lead >= 0xE0 and 3 or lead >= 0xC0 and 2 or 1
+        -- A malformed or cut-off character: count its bytes one by one.
+        for j = i + 1, i + size - 1 do
+            local b = s:byte(j)
+            if not b or b < 0x80 or b > 0xBF then size = 1 break end
+        end
+        local cost = size == 4 and 2 or 1
+        if units + cost > max then break end
+        units, i = units + cost, i + size
+    end
+    return string.sub(s, 1, i - 1)
+end
+
 --- A whole number in [0, 2^31-1], or nil.
 function ns.AsId(v)
     if type(v) ~= "number" or v ~= v or v < 0 or v > 2147483647 then return nil end

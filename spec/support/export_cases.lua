@@ -95,6 +95,17 @@ local cases = {
         setup = function() WowStub.state.guildRoster = WowStub.roster(2000) end },
     { name = "guild-2100-capped", section = "guild",
         setup = function() WowStub.state.guildRoster = WowStub.roster(2100) end },
+    -- ROK-2137: the in-game Message of the Day / Guild Information. Every guild
+    -- case above carries both boxes; these are the empty, unreadable and
+    -- over-length ones (clipped to 255 / 499 UTF-16 units).
+    { name = "guild-text-empty-boxes", section = "guild",
+        setup = function() WowStub.state.guildMotd, WowStub.state.guildInfoText = "", "" end },
+    { name = "guild-text-unreadable", section = "guild",
+        setup = function() WowStub.state.guildMotd, WowStub.state.guildInfoText = nil, nil end },
+    { name = "guild-text-over-length", section = "guild", setup = function()
+        WowStub.state.guildMotd = string.rep("\195\169", 300)
+        WowStub.state.guildInfoText = "x" .. string.rep("\240\159\148\165", 300)
+    end },
     { name = "raid-1-pull", section = "raid", setup = function(ns) raidPulls(ns, 1, 40) end },
     -- "Export all" (ROK-1737): one paste, one string per section, one per line.
     { name = "all-char-guild-raid", section = "all", setup = function(ns) raidPulls(ns, 3, 25) end },
