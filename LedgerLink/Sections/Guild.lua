@@ -1,6 +1,8 @@
 -- Guild roster export (`!RL1!guild!...`, or `!RL1!guild-<n>of<m>!...` pages).
 -- Contract: AddonGuildDataSchema / AddonGuildMemberSchema (strict).
 -- The officer note is NEVER read, let alone exported (operator ruling Q4/Q6).
+-- The Message of the Day and Guild Information boxes (`motd`, `infoText`,
+-- Raid Ledger ROK-2137) are the guild's public text: every member reads them.
 local _, ns = ...
 
 local Json = ns.Json
@@ -14,6 +16,8 @@ Guild.MEMBERS_PER_PAGE = 250
 --- Defensive loop bound if GetNumGuildMembers returns something absurd.
 local MAX_ROSTER_SCAN = 10000
 local MAX_NOTE = 256
+--- Contract AddonGuildDataSchema.motd / .infoText max, in UTF-16 units.
+Guild.MAX_MOTD, Guild.MAX_INFO_TEXT = 255, 499
 
 -- GetGuildRosterInfo(i), retail order (UNVERIFIED on Forever, beta E1):
 --  1 name  2 rankName  3 rankIndex  4 level  5 classDisplayName  6 zone
@@ -106,6 +110,29 @@ local function collectMembers(includeNotes)
     return members, skipped, dupes
 end
 
+-- One in-game text box as `read` returns it, clipped to `max` UTF-16 units and
+-- otherwise verbatim (colour codes and newlines kept). Errors on anything odd.
+local function boxText(read, max)
+    local text = read()
+    -- A secret value can't be measured or encoded: treat it as unreadable.
+    if type(issecretvalue) == "function" and issecretvalue(text) then return nil end
+    return ns.ClipUtf16(text, max)
+end
+
+-- "" = the box is empty; nil = could not read it (the key is then left out,
+-- which Raid Ledger takes as "no opinion"). Never "" for a failed read.
+-- Forever's own Guild window reads C_GuildInfo.GetMOTD / GetInfoText; the
+-- pre-12.0 globals are only aliases the client defines when the
+-- loadDeprecationFallbacks CVar is on (Blizzard_DeprecatedGuildScript).
+local function readBox(method, legacy, max)
+    local api = type(C_GuildInfo) == "table" and C_GuildInfo or {}
+    for _, read in ipairs({ api[method] or false, _G[legacy] or false }) do
+        local text = type(read) == "function" and ns.SafeCall(boxText, read, max) or nil
+        if text then return text end
+    end
+    return nil
+end
+
 -- The roster as read right now; nil + a message when the client can't give it.
 -- `quiet` skips the chat report (the background refresh below).
 local function buildLive(quiet)
@@ -128,6 +155,8 @@ local function buildLive(quiet)
         snapshotAt = math.floor(ns.SafeCall(GetServerTime) or time()),
         canViewOfficerNote = false, -- always: officer notes are never exported
         members = members,
+        motd = readBox("GetMOTD", "GetGuildRosterMOTD", Guild.MAX_MOTD),
+        infoText = readBox("GetInfoText", "GetGuildInfoText", Guild.MAX_INFO_TEXT),
     }
 end
 
@@ -136,7 +165,8 @@ end
 -- the roster is empty, so every logout export lost its guild page (2026-11-07).
 -- The last roster read while playing is kept (this session only, in memory)
 -- with its own snapshotAt, and used whenever the live read fails. Leaving the
--- guild (PLAYER_GUILD_UPDATE while not in one) drops it.
+-- guild (PLAYER_GUILD_UPDATE while not in one) drops it. The cache holds the
+-- motd / infoText read with that roster; one it could not read stays absent.
 Guild.cache = nil
 --- Background refreshes on GUILD_ROSTER_UPDATE run at most this often.
 Guild.REFRESH_SECONDS = 10
@@ -192,7 +222,7 @@ local function cachedForExport()
         members[i] = row
     end
     return { name = cache.name, rawRealm = cache.rawRealm, snapshotAt = cache.snapshotAt,
-        canViewOfficerNote = false, members = members }
+        canViewOfficerNote = false, members = members, motd = cache.motd, infoText = cache.infoText }
 end
 
 --- The live roster (also refreshing the cache), else the cached one.
@@ -208,7 +238,8 @@ function Guild.Build()
 end
 
 --- Split `data.members` into pages of MEMBERS_PER_PAGE. Every page repeats
---- name / rawRealm / snapshotAt / canViewOfficerNote (the server checks them).
+--- name / rawRealm / snapshotAt / canViewOfficerNote (the server checks them);
+--- motd / infoText go on page 1 only, where the server reads them.
 function Guild.Paginate(data)
     local per = Guild.MEMBERS_PER_PAGE
     local count = math.max(1, math.ceil(#data.members / per))
@@ -222,6 +253,7 @@ function Guild.Paginate(data)
             canViewOfficerNote = false, members = slice,
         }
     end
+    chunks[1].motd, chunks[1].infoText = data.motd, data.infoText
     return chunks
 end
 

@@ -85,6 +85,8 @@ local CALLS = {
 local PRESENCE = {
     "C_EncodingUtil", "C_EncodingUtil.CompressString", "C_EncodingUtil.EncodeBase64",
     "Enum.CompressionMethod", "C_GuildInfo", "C_GuildInfo.GuildRoster", "GuildRoster",
+    -- Guild Message of the Day / Guild Information reads (ROK-2137), then their pre-12.0 aliases.
+    "C_GuildInfo.GetMOTD", "C_GuildInfo.GetInfoText", "GetGuildRosterMOTD", "GetGuildInfoText", "issecretvalue",
     "C_Traits", "C_Item.GetDetailedItemLevelInfo", "C_Seasons",
 }
 
@@ -1270,7 +1272,10 @@ function Probe.CacheLine()
     local g, c = ns.Guild.cache, ns.Char.cache
     local guild = "none"
     if g then
-        guild = string.format("%s, %d members as of %s", g.name, #g.members, date("%H:%M:%S", g.snapshotAt))
+        -- Sizes only: the Message of the Day / Guild Information text is never printed here.
+        local function box(text) return type(text) == "string" and (#text .. " bytes") or "unread" end
+        guild = string.format("%s, %d members as of %s, motd %s, info %s", g.name, #g.members,
+            date("%H:%M:%S", g.snapshotAt), box(g.motd), box(g.infoText))
     end
     return string.format("logout cache: guild = %s; gear = %s; talents = %s", guild,
         c.gear and (#c.gear .. " items") or "none", c.talents and (#c.talents.nodes .. " nodes") or "none")

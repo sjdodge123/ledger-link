@@ -2,7 +2,7 @@ local loadAddon = require("spec.support.load_addon")
 local decode = require("spec.support.decode")
 
 -- Key sets copied from the Raid Ledger contract (wow-addon-export.schema.ts).
-local GUILD_ALLOWED = { "canViewOfficerNote", "members", "name", "rawRealm", "snapshotAt" }
+local GUILD_ALLOWED = { "canViewOfficerNote", "infoText", "members", "motd", "name", "rawRealm", "snapshotAt" }
 local GUILD_REQUIRED = { "canViewOfficerNote", "members", "name", "snapshotAt" }
 local MEMBER_ALLOWED = { "class", "guid", "lastOnlineDays", "level", "name", "note", "online", "rank", "rankIndex" }
 local MEMBER_REQUIRED = { "class", "guid", "level", "name", "online", "rank", "rankIndex" }
