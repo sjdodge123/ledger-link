@@ -110,27 +110,72 @@ local function collectMembers(includeNotes)
     return members, skipped, dupes
 end
 
--- One in-game text box as `read` returns it, clipped to `max` UTF-16 units and
--- otherwise verbatim (colour codes and newlines kept). Errors on anything odd.
-local function boxText(read, max)
-    local text = read()
+-- One in-game text box as `readGuildText` returns it, clipped to `max` UTF-16
+-- units and otherwise verbatim (colour codes and newlines kept). Errors on
+-- anything odd. (A blocked call is reported under this local's name.)
+local function boxText(readGuildText, max)
+    local text = readGuildText()
     -- A secret value can't be measured or encoded: treat it as unreadable.
     if type(issecretvalue) == "function" and issecretvalue(text) then return nil end
     return ns.ClipUtf16(text, max)
 end
+
+--- After a guild text read is blocked, no read is tried for this long.
+Guild.TEXT_RETRY_SECONDS = 300
+local textBlockedAt
 
 -- "" = the box is empty; nil = could not read it (the key is then left out,
 -- which Raid Ledger takes as "no opinion"). Never "" for a failed read.
 -- Forever's own Guild window reads C_GuildInfo.GetMOTD / GetInfoText; the
 -- pre-12.0 globals are only aliases the client defines when the
 -- loadDeprecationFallbacks CVar is on (Blizzard_DeprecatedGuildScript).
+-- Both reads are HasRestrictions APIs: while the game enforces an addon
+-- restriction (combat, an encounter, a restricted map, chat lockdown) it blocks
+-- them with ADDON_ACTION_BLOCKED "read()" (2026-11-11, background refreshes).
+-- Second return: true when the game blocked the read.
 local function readBox(method, legacy, max)
     local api = type(C_GuildInfo) == "table" and C_GuildInfo or {}
-    for _, read in ipairs({ api[method] or false, _G[legacy] or false }) do
-        local text = type(read) == "function" and ns.SafeCall(boxText, read, max) or nil
+    for _, readGuildText in ipairs({ api[method] or false, _G[legacy] or false }) do
+        local blocksBefore = ns.Blocked.count
+        local text = type(readGuildText) == "function" and ns.SafeCall(boxText, readGuildText, max) or nil
+        if ns.Blocked.count > blocksBefore then
+            textBlockedAt = ns.SafeCall(GetServerTime) or time()
+            return nil, true -- the alias is the same API: don't trip it too
+        end
         if text then return text end
     end
     return nil
+end
+
+-- Whether to try the guild text reads now: no addon restriction is on and no
+-- read was blocked in the last TEXT_RETRY_SECONDS.
+local function textReadable()
+    if #ns.Blocked.ActiveRestrictions() > 0 then return false end
+    local now = ns.SafeCall(GetServerTime) or time()
+    return not textBlockedAt or now - textBlockedAt >= Guild.TEXT_RETRY_SECONDS
+end
+
+-- motd, infoText: read now when allowed. A box not read because of a
+-- restriction or a block keeps the text last read for this guild this session;
+-- a read that ran and failed leaves it out (see readBox).
+local function readBoxes(guildName)
+    local motd, infoText
+    local motdTried, infoTried = false, false
+    if textReadable() then
+        local blocked
+        motd, blocked = readBox("GetMOTD", "GetGuildRosterMOTD", Guild.MAX_MOTD)
+        motdTried = not blocked
+        if not blocked then
+            infoText, blocked = readBox("GetInfoText", "GetGuildInfoText", Guild.MAX_INFO_TEXT)
+            infoTried = not blocked
+        end
+    end
+    local last = Guild.cache
+    if last and last.name == guildName then
+        if not motdTried then motd = last.motd end
+        if not infoTried then infoText = last.infoText end
+    end
+    return motd, infoText
 end
 
 -- The roster as read right now; nil + a message when the client can't give it.
@@ -149,14 +194,15 @@ local function buildLive(quiet)
     if not quiet then report(skipped, dupes, omitted) end
     if #members == 0 then return nil, "No readable guild members. Please report this." end
     local rawRealm = ns.Clip(realm, 64) or ns.Clip(ns.SafeCall(GetRealmName), 64)
+    local motd, infoText = readBoxes(name)
     return {
         name = name,
         rawRealm = rawRealm ~= "" and rawRealm or nil,
         snapshotAt = math.floor(ns.SafeCall(GetServerTime) or time()),
         canViewOfficerNote = false, -- always: officer notes are never exported
         members = members,
-        motd = readBox("GetMOTD", "GetGuildRosterMOTD", Guild.MAX_MOTD),
-        infoText = readBox("GetInfoText", "GetGuildInfoText", Guild.MAX_INFO_TEXT),
+        motd = motd,
+        infoText = infoText,
     }
 end
 

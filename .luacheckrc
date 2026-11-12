@@ -23,6 +23,8 @@ read_globals = {
     "GetNumSavedInstances", "GetSavedInstanceInfo",
     -- guild section
     "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildRosterLastOnline", "C_GuildInfo", "issecretvalue",
+    -- addon restrictions (12.0-era clients; may be missing)
+    "C_RestrictedActions",
     -- char section, Mailworthy guild contributions (ROK-2148; the Mailworthy addon's API)
     "MailworthyAPI",
     -- raid section
