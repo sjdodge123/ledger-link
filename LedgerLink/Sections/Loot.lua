@@ -86,9 +86,10 @@ end
 
 -- GlobalStrings format -> anchored Lua pattern + which capture holds which
 -- argument ("%s", "%d" and the positional "%2$s" some languages use).
+-- `capture[argument number] = capture index`.
 local function compile(fmt)
     if type(fmt) ~= "string" or fmt == "" then return nil end
-    local parts, order, pos, n = { "^" }, {}, 1, 0
+    local parts, capture, pos, n = { "^" }, {}, 1, 0
     while true do
         local s, e, index, kind = string.find(fmt, "%%(%d*)%$?([sd])", pos)
         local literal = string.sub(fmt, pos, (s or 0) - 1)
@@ -96,12 +97,12 @@ local function compile(fmt)
         parts[#parts + 1] = (string.gsub(literal, "[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0"))
         if not s then break end
         n = n + 1
-        order[n] = tonumber(index) or n
+        capture[tonumber(index) or n] = n
         parts[#parts + 1] = kind == "d" and "(%d+)" or "(.+)"
         pos = e + 1
     end
     parts[#parts + 1] = "$"
-    return { pattern = table.concat(parts), order = order }
+    return { pattern = table.concat(parts), capture = capture }
 end
 
 -- Which loot lines are read, most specific first: "x%d" lines before the
@@ -143,7 +144,7 @@ function Loot.Parse(text)
         local caps = { string.match(text, c.pattern) }
         if caps[1] ~= nil then
             local out = { self = c.line.self == true, won = c.line.won == true }
-            for i, arg in ipairs(c.line.args) do out[arg] = caps[c.order[i]] end
+            for i, arg in ipairs(c.line.args) do out[arg] = caps[c.capture[i] or 0] end
             out.quantity = tonumber(out.quantity) or 1
             return out
         end
@@ -186,18 +187,24 @@ local function selfName()
 end
 
 local function baseName(name) return (string.match(name, "^(.-)%-[^%-]*$")) or name end
+local function hasRealm(name) return string.find(name, "-", 1, true) ~= nil end
 
 --- The group member called `name`: their GUID, or nil when not in the group.
+--- Exact name first; then "Name" against "Name-Realm" (either way round), only
+--- when exactly one member fits. Two different realms never match.
 function Loot.GuidFor(name)
     local guids, names = ns.Raid.Roster()
     for i, n in ipairs(names) do
         if n == name then return guids[i] end
     end
-    local base = baseName(name)
+    local found
     for i, n in ipairs(names) do
-        if baseName(n) == base then return guids[i] end
+        if (not hasRealm(name) and baseName(n) == name) or (not hasRealm(n) and baseName(name) == n) then
+            if found then return nil end
+            found = guids[i]
+        end
     end
-    return nil
+    return found
 end
 
 --- In a party or raid, inside a dungeon or raid instance (draft §3).
@@ -335,7 +342,7 @@ function Loot.OnLoot(text, playerName, ...)
     end
     local now = ns.Raid.Now()
     if parsed.won then
-        wins[#wins + 1] = { key = baseName(name), itemId = itemId, at = now }
+        wins[#wins + 1] = { key = name, itemId = itemId, at = now }
         return
     end
     local looterGuid = Loot.GuidFor(name)
@@ -348,7 +355,7 @@ function Loot.OnLoot(text, playerName, ...)
         quality = quality,
         looterName = name,
         looterGuid = looterGuid,
-        method = methodFor(takeWin(baseName(name), itemId, now), quality),
+        method = methodFor(takeWin(name, itemId, now), quality),
     })
 end
 

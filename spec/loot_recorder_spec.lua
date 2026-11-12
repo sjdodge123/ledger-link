@@ -240,6 +240,34 @@ describe("loot recorder (contract v2 draft)", function()
         assert.equals(4, parsed.quantity)
     end)
 
+    it("maps positional arguments whose order is not its own inverse", function()
+        _G.LOOT_ITEM_MULTIPLE = "%2$s (%3$d) -> %1$s."
+        ns.Loot.ResetMatchers()
+        loot(ns, link(50, EPIC) .. " (4) -> Raider3 Doe.")
+        local d = ns.Loot.Build().drops[1]
+        assert.equals(50, d.itemId)
+        assert.equals(4, d.quantity)
+        assert.equals("Raider3 Doe", d.looterName)
+        assert.equals("Player-4395-00020003", d.looterGuid)
+    end)
+
+    it("never gives one realm's player another realm's GUID or roll win", function()
+        WowStub.state.units.raid3.name = "Same-RealmA"
+        assert.is_nil(ns.Loot.GuidFor("Same-RealmB"))
+        assert.equals("Player-4395-00020003", ns.Loot.GuidFor("Same"))
+        WowStub.state.units.raid4.name = "Same-RealmC"
+        assert.is_nil(ns.Loot.GuidFor("Same")) -- two members fit: ambiguous
+        WowStub.state.units.raid5.name = "Solo"
+        assert.equals("Player-4395-00020005", ns.Loot.GuidFor("Solo-RealmX"))
+        WowStub.state.lootMethod = 3
+        loot(ns, "Same-RealmA won: " .. link(70, EPIC))
+        loot(ns, "Same-RealmC receives loot: " .. link(70, EPIC) .. ".")
+        loot(ns, "Same-RealmA receives loot: " .. link(70, EPIC) .. ".")
+        local drops = ns.Loot.Build().drops
+        assert.equals("unknown", drops[1].method)
+        assert.equals("roll", drops[2].method)
+    end)
+
     it("is not an export section yet: nothing can emit loot or a v2 string", function()
         loot(ns, "Raider3 Doe receives loot: " .. link(60, EPIC) .. ".")
         local pages, err = ns.Export.RunPages("loot")
