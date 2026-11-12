@@ -26,6 +26,8 @@ local function defaultState()
         guild = "Night Shift",
         serverTime = 1790000000,
         inCombat = false,
+        -- C_RestrictedActions.IsAddOnRestrictionActive: Enum.AddOnRestrictionType value -> true
+        restrictions = {},
         gear = {
             [1] = { id = 16921, link = "|cffa335ee|Hitem:16921::::::::60:::::|h[Halo of Transcendence]|h|r", ilvl = 76 },
             [16] = { id = 19019, link = "|cffff8000|Hitem:19019:0:0:0:0:0:0:0:60:0:0:0:2:6646:7890|h[Thunderfury]|h|r", ilvl = 80 },
@@ -166,6 +168,9 @@ _G.IsInRaid = function() return s().inRaid end
 _G.GetInstanceInfo = function() return unpack(s().instance, 1, 8) end
 _G.GetServerTime = function() return s().serverTime end
 _G.InCombatLockdown = function() return s().inCombat end
+_G.C_RestrictedActions = {
+    IsAddOnRestrictionActive = function(t) return s().restrictions[t] == true end,
+}
 _G.GetInventoryItemLink = function(_, slot) local g = s().gear[slot] return g and g.link end
 _G.GetInventoryItemID = function(_, slot) local g = s().gear[slot] return g and g.id end
 _G.C_Item = {
@@ -190,6 +195,7 @@ _G.GetSavedInstanceInfo = function(i) return unpack(s().lockouts[i], 1, 14) end
 _G.Enum = {
     CompressionMethod = { Deflate = 0, Zlib = 1, Gzip = 2 },
     CompressionLevel = { Default = 0, OptimizeForSpeed = 1, OptimizeForSize = 2 },
+    AddOnRestrictionType = { Combat = 0, Encounter = 1, ChallengeMode = 2, PvPMatch = 3, Map = 4, Chat = 5 },
 }
 _G.C_EncodingUtil = {
     CompressString = function(source, method)

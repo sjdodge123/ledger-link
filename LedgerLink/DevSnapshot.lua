@@ -46,7 +46,8 @@ DevSnapshot.WATCHED = {
     "C_SkillInfo", "C_SkillInfo.GetNumSkillLines", "C_SkillInfo.GetSkillLineInfo", "GetSkillLineInfo",
     "GetNumSkillLines", "GetProfessions", "GetProfessionInfo", "C_TradeSkillUI.GetProfessionInfoBySkillLineID",
     "C_AddOns", "C_AddOns.GetAddOnMetadata", "GetAddOnMetadata", "debugprofilestop", "CreateFrame",
-    "GetCursorPosition",
+    "GetCursorPosition", "C_RestrictedActions", "C_RestrictedActions.IsAddOnRestrictionActive",
+    "Enum.AddOnRestrictionType",
 }
 
 local resolve = Probe.resolve
