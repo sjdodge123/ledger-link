@@ -48,6 +48,9 @@ DevSnapshot.WATCHED = {
     "C_AddOns", "C_AddOns.GetAddOnMetadata", "GetAddOnMetadata", "debugprofilestop", "CreateFrame",
     "GetCursorPosition", "C_RestrictedActions", "C_RestrictedActions.IsAddOnRestrictionActive",
     "Enum.AddOnRestrictionType",
+    -- loot recorder (contract v2 draft, ROK-2184)
+    "IsInGroup", "IsInInstance", "C_PartyInfo", "C_PartyInfo.GetLootMethod", "Enum.LootMethod", "GetLootMethod",
+    "GetLootThreshold", "GetItemInfo", "C_LootHistory", "C_LootHistory.GetAllEncounterInfos",
 }
 
 local resolve = Probe.resolve

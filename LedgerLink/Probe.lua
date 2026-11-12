@@ -1254,6 +1254,51 @@ local function s9Lines(lines)
     end
 end
 
+-- "S10": loot history (Raid Ledger ROK-2184, contract v2 DRAFT `loot`; not
+-- exported yet). Can the recorder read loot lines on Forever: the GlobalStrings
+-- it matches, the loot method, whether CHAT_MSG_LOOT arrives secret, what the
+-- event's name/GUID arguments hold, and what it stored. Read-only.
+local function s10Lines(lines)
+    local loot = ns.Loot
+    local strings = {}
+    for _, name in ipairs(loot.LINE_STRINGS) do
+        local v = rawget(_G, name)
+        strings[#strings + 1] = name .. " = " .. (type(v) == "string" and format(v, 0) or "missing")
+    end
+    lines[#lines + 1] = "S10 loot strings: " .. table.concat(strings, ", ")
+    local function value(path, ...)
+        local results = { call(fn(path), ...) }
+        if results[1] ~= "ok" then return failure(results[1], results[2]) end
+        return formatResults({ unpack(results, 2, table.maxn(results)) }, table.maxn(results) - 1)
+    end
+    lines[#lines + 1] = string.format("S10 loot method: C_PartyInfo.GetLootMethod() = %s (reads as %s),"
+        .. " GetLootMethod() = %s, GetLootThreshold() = %s, IsInGroup() = %s, IsInInstance() = %s, recording now = %s",
+        value("C_PartyInfo.GetLootMethod"), tostring(loot.Method()), value("GetLootMethod"),
+        value("GetLootThreshold"), value("IsInGroup"), value("IsInInstance"), loot.Recording() and "yes" or "no")
+    local hStatus, infos = call(fn("C_LootHistory.GetAllEncounterInfos"))
+    lines[#lines + 1] = "S10 C_LootHistory.GetAllEncounterInfos() = " .. (hStatus ~= "ok" and failure(hStatus, infos)
+        or type(infos) == "table" and (#infos .. " encounter(s)") or format(infos, 0))
+    local st = loot.stats
+    lines[#lines + 1] = string.format("S10 loot lines this session: seen %d, recorded %d, outside a group/instance %d,"
+        .. " below uncommon %d, secret %d, unparsed %d, not an item %d",
+        st.seen, st.recorded, st.outside, st.lowQuality, st.secret, st.unparsed, st.notItem)
+    local last = loot.last
+    if last then
+        lines[#lines + 1] = string.format("S10 last loot line: name argument %s, GUID argument %s, roster GUID %s",
+            last.nameArg, last.guidArg, tostring(last.looterGuid or "-"))
+    end
+    if loot.lastUnparsed then lines[#lines + 1] = "S10 last unparsed loot line: " .. format(loot.lastUnparsed, 0) end
+    local drops = loot.Drops()
+    lines[#lines + 1] = string.format("S10 drops stored: %d since %s (not exported yet: waits for Raid Ledger's v2 import)",
+        #drops, date("%Y-%m-%d %H:%M", loot.Since()))
+    for i = #drops, math.max(#drops - 2, 1), -1 do
+        local d = drops[i]
+        lines[#lines + 1] = string.format("S10 drop %s: item %s quality %s x%s %s, instance %s, encounter %s, looter GUID %s",
+            date("%m-%d %H:%M", d.at), tostring(d.itemId), tostring(d.quality), tostring(d.quantity),
+            tostring(d.method), tostring(d.instanceId), tostring(d.encounterId), d.looterGuid and "yes" or "no")
+    end
+end
+
 local function s3Lines(lines)
     local sStatus, sex = call(UnitSex, "player")
     lines[#lines + 1] = 'S3 UnitSex("player") = ' .. (sStatus == "ok" and format(sex, 0) or sStatus)
@@ -1265,7 +1310,7 @@ end
 
 -- Section builders by id, for the dev snapshot (DevSnapshot.SECTIONS picks some).
 Probe.SECTION_BUILDERS = { S3 = s3Lines, S4 = s4Lines, S5 = s5Lines, S6 = s6Lines, S7 = s7Lines, S8 = s8Lines,
-    S9 = s9Lines }
+    S9 = s9Lines, S10 = s10Lines }
 
 --- What the logout auto-export would fall back to (Guild.cache, Char.cache).
 function Probe.CacheLine()
@@ -1304,6 +1349,7 @@ function Probe.Report()
     s7Lines(lines)
     s8Lines(lines)
     s9Lines(lines)
+    s10Lines(lines)
     return table.concat(lines, "\n")
 end
 

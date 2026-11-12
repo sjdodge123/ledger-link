@@ -95,6 +95,20 @@ many were left out (ROK-2123). There is no damage or DPS data: the
 combat log (`COMBAT_LOG_EVENT_UNFILTERED`) is closed to addons on Forever, so
 Details!/DBM-style log parsing is impossible in-game.
 
+**Loot history (recorded, not exported yet).** Raid Ledger is drafting a v2
+wire format with a `loot` section (ROK-2184). Until that format lands in Raid
+Ledger and its server accepts it, Ledger Link **records** loot but never exports
+it: there is no `/rl export loot`, and every string stays `!RL1!`. While you are
+in a party or raid inside a dungeon or raid, each loot line in chat
+(`CHAT_MSG_LOOT`, matched with the game's own `LOOT_ITEM*` / `LOOT_ROLL_*WON`
+texts, so any game language works) for an item of uncommon quality or better is
+kept: who received it (name, and their GUID when they are in your group), the
+item id and link, stack size, quality, how it was looted (`master`, a won
+`roll`, `direct`, or `unknown`), the instance and difficulty, and the boss when
+a kill in the same instance ended at most 300 s earlier. No roll numbers and no
+chat text are kept. `LedgerLinkDB.loot` holds the last 30 days, at most 500
+drops. `/rl probe` (the `S10` lines) shows what the recorder sees.
+
 **Export all.** The panel's **Export to Raid Ledger** button (or `/rl export all`) shows
 the character string, every guild page and the raid string in one box, one per
 line, to paste into Raid Ledger in one go (Raid Ledger ROK-1737, CONTRACT.md
@@ -164,6 +178,10 @@ story or a GitHub issue). `/console scriptErrors 1` first so Lua errors show.
    bag item and open its menu (then close it): the `S7` lines name that menu.
 10. **AH deposits (S8):** at the auction house, with the AH window open,
     `/rl probe` and paste back the report. Nothing is posted.
+11. **Loot (S10):** in a group in a dungeon, kill a boss, let loot be handed out
+    (or need/greed it), then `/rl probe`. Paste back the `S10` lines: the
+    session counts, `last loot line` and the stored drops should match what
+    chat showed. Nothing is exported.
 
 ## Reporting a bug
 
@@ -307,6 +325,12 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `GetGuildRosterLastOnline(i)` (years, months, days) | returns nothing for an online member, as expected (probe, 2026-10-05); offline members still to check in the preview | `lastOnlineDays` omitted |
 | `C_GuildInfo.GetMOTD()` / `C_GuildInfo.GetInfoText()` (guild export `motd` / `infoText`, ROK-2137) | **confirmed** on live build 1.60.1.70888 with v1.5.0 (2026-11-11, read over the dev bridge): the `/rl dev` snapshot reports `C_GuildInfo.GetMOTD`, `C_GuildInfo.GetInfoText`, the pre-12.0 globals `GetGuildRosterMOTD` / `GetGuildInfoText` and `issecretvalue` all as functions, and that logout's auto-export carried both keys, non-empty, from the roster cache (the page validates against `contract/v1/schema.json`). The addon tries `C_GuildInfo` first. In Blizzard's UI source the globals are only aliases, defined when the `loadDeprecationFallbacks` CVar is on, and the API docs mark both reads `HasRestrictions`. **They are blocked while an addon restriction is on**: on 2026-11-11 the background roster refresh got three `ADDON_ACTION_BLOCKED read()` in chat (no command run). The addon now skips both reads while `InCombatLockdown()` or `C_RestrictedActions.IsAddOnRestrictionActive(type)` is true for any `Enum.AddOnRestrictionType`, waits `Guild.TEXT_RETRY_SECONDS` (300) after a block, keeps the text last read that session, and names the call `readGuildText()` in any further block. **Unverified**: which restriction was on, and that `C_RestrictedActions` exists on Forever: `/rl probe` prints an `addon restrictions:` line. **Still unverified**: that both boxes are loaded whenever the roster is (a read before the guild data arrives could return `""`); the `logout cache:` line of `/rl probe` says what was read (`motd 77 bytes` / `motd unread`) | the key is left out (missing API, an error, a non-string or a secret value); Raid Ledger keeps what it stored |
 | `GetGuildInfo("player")` 4th return (realm) | **confirmed**: `"ClassicBetaPvP2"`, which differs from `GetRealmName()` (probe, 2026-10-05) | `rawRealm` falls back to `GetRealmName()` |
+| `CHAT_MSG_LOOT` lines readable in a dungeon/raid (12.0-era secret values) | Forever's API docs mark the text, name and GUID arguments as possibly secret; `/rl probe` `S10 loot lines this session: ... secret N` | secret lines are counted and skipped; no loot recorded |
+| `LOOT_ITEM`, `LOOT_ITEM_MULTIPLE`, `LOOT_ITEM_SELF(_MULTIPLE)`, `LOOT_ROLL_WON`, `LOOT_ROLL_YOU_WON` GlobalStrings | `S10 loot strings:` prints each one; `unparsed` count stays 0 for receive lines | a missing string's lines are not recorded (`S10 last unparsed loot line` shows one) |
+| `C_PartyInfo.GetLootMethod()` returns `Enum.LootMethod` (documented in Forever's UI source), `GetLootThreshold()` | `S10 loot method:` in a master-loot and a group-loot party | falls back to the legacy `GetLootMethod()`; else every drop is `unknown` (or `roll` after a won line) |
+| A won roll prints `LOOT_ROLL_WON` before the receive line, within 60 s | need/greed an item: its drop shows `roll` in `S10 drop` | the drop is `unknown` |
+| `IsInGroup()` / `IsInInstance()` | `S10 ... recording now = yes` in a dungeon group | `IsInGroup` falls back to `GetNumGroupMembers()`; outside a party/raid instance nothing is recorded |
+| `CHAT_MSG_LOOT` 12th argument is the looter's GUID | `S10 last loot line: GUID argument ...` vs `roster GUID` | unused for now: the looter's GUID comes from the group roster, per the draft |
 | `ENCOUNTER_START` / `ENCOUNTER_END` fire with IDs on Forever (E5) | `/rl raid` after a boss | no pulls recorded |
 | `UnitGUID("raidN")` / `GetUnitName` readable during an encounter (secret values, E5) | roster count in the raid preview | roster re-read at `ENCOUNTER_END`; empty roster if both are secret |
 | `GetInstanceInfo()` 8th return = instance id | **confirmed** (Kalimdor = 1, 11 returns) (probe, 2026-10-05) | `instanceId` omitted |

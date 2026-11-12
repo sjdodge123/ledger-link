@@ -148,6 +148,7 @@ describe("/rl probe: S4 dungeon + legacy discovery", function()
     end)
 
     it("degrades to missing for every new section when nothing is there", function()
+        _G.IsInGroup = nil -- the shared stub defines it (loot recorder); after_each restores it
         local text = report(ns)
         has(text, "S4 IsInGroup() = missing")
         has(text, "S4 map: C_Map.GetBestMapForUnit missing")

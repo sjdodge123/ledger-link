@@ -29,6 +29,8 @@ read_globals = {
     "MailworthyAPI",
     -- raid section
     "GetNumGroupMembers", "IsInRaid", "GetInstanceInfo",
+    -- loot recorder (contract v2 draft, not exported yet; each may be missing)
+    "IsInGroup", "IsInInstance", "C_PartyInfo", "GetLootMethod", "GetLootThreshold", "GetItemInfo", "C_LootHistory",
     -- encoding
     "C_EncodingUtil", "Enum",
     -- /rl probe (read-only; each one may be missing on the beta)
