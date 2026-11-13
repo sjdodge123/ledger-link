@@ -1326,6 +1326,20 @@ function Probe.CacheLine()
         c.gear and (#c.gear .. " items") or "none", c.talents and (#c.talents.nodes .. " nodes") or "none")
 end
 
+--- The char quest / lockout caches, and whether the game sent that data this
+--- session (an empty read is trusted only then: Char.QuestsOrCached /
+--- Char.LockoutsOrCached).
+function Probe.CharCacheLine()
+    local c, loaded = ns.Char.cache, ns.Char.loaded
+    local function yes(v) return v and "yes" or "no" end
+    return string.format("char cache: completed quests = %s; quest log = %s (QUEST_LOG_UPDATE %s); "
+        .. "lockouts = %s (UPDATE_INSTANCE_INFO %s); unknown completed = %s",
+        c.completed and (#c.completed.ids .. " ids") or "none",
+        c.inProgress and (#c.inProgress .. " quests") or "none", yes(loaded.questLog),
+        c.lockouts and (#c.lockouts .. " lockouts") or "none", yes(loaded.instanceInfo),
+        ns.Char.OMIT_UNKNOWN_COMPLETED and "left out" or "sent as []")
+end
+
 --- Plain-text report, one line per check.
 function Probe.Report()
     local lines = {
@@ -1335,6 +1349,7 @@ function Probe.Report()
             tostring(LedgerLinkDB and LedgerLinkDB.region), #ns.Raid.Pulls()),
     }
     lines[#lines + 1] = Probe.CacheLine()
+    lines[#lines + 1] = Probe.CharCacheLine()
     lines[#lines + 1] = ns.Guild.TextStateLine()
     lines[#lines + 1] = ns.Blocked.RestrictionLine()
     for _, line in ipairs(ns.Blocked.Lines()) do lines[#lines + 1] = line end

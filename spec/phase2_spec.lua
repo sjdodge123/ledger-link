@@ -143,10 +143,10 @@ describe("Phase 2 fields", function()
             assert.equal(128, #q.inProgress[1].objectives[1].text)
         end)
 
-        it("sends an empty completed list when only the quest log is available", function()
+        it("leaves `completed` out when only the quest log is available (ROK-2125: no opinion)", function()
             _G.C_QuestLog.GetAllCompletedQuestIDs = nil
             local q = payload(ns).data.quests
-            assert.same({}, q.completed)
+            assert.is_nil(q.completed)
             assert.equal(2, #q.inProgress)
         end)
 

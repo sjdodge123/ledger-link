@@ -39,7 +39,19 @@ dropped your guild, gear and talents, so the addon keeps the last guild roster,
 gear and talents it read while you played (in memory, this session only:
 refreshed on entering/leaving the world, `GUILD_ROSTER_UPDATE` at most every
 10 s, `PLAYER_GUILD_UPDATE`, `PLAYER_EQUIPMENT_CHANGED` and talent changes) and
-the logout export uses them when the live read is empty. The guild page keeps
+the logout export uses them when the live read is empty. Completed quests,
+the quest log and lockouts are kept the same way, because Raid Ledger replaces
+the whole character snapshot on import: an empty read before the game has sent
+them, during an outage or at logout would wipe what Raid Ledger stored
+(`completed: []` means "no quests completed"). An empty completed-quest list is
+never trusted. An empty quest log or lockout list is trusted only after
+`QUEST_LOG_UPDATE` / `UPDATE_INSTANCE_INFO` since the last loading screen,
+and never while leaving the world; otherwise the last list read is sent (lockouts that have
+reset since are dropped). With no completed list read this session the export
+leaves `completed` out, which Raid Ledger (ROK-2125, on prod since 2026-11-13)
+reads as "no opinion" and keeps its stored list (`Char.OMIT_UNKNOWN_COMPLETED`;
+off, it sends `[]`). With no lockouts read the empty list still goes out:
+`lockouts` is a required key. `/rl probe` shows these in a `char cache:` line. The guild page keeps
 the `snapshotAt` of when the roster was read. Leaving the guild drops the cached
 roster; an empty gear or talent read never replaces a cached one. If the roster
 never loaded this session it stores the character alone, unless you clicked
@@ -323,6 +335,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | `GetInventoryItemID` / `GetInventoryItemLink` / `C_Item.GetDetailedItemLevelInfo` | gear count + item levels in the import preview | slot skipped / `ilvl` omitted |
 | `C_ClassTalents.GetActiveConfigID`, `C_Traits.GetConfigInfo/GetTreeNodes/GetNodeInfo/GenerateImportString` | talent node count in the import preview | `talents.nodes` empty |
 | `GetNumSavedInstances` / `GetSavedInstanceInfo` (14th return `instanceId`) | lockouts in the import preview | lockout rows without an instance id are skipped |
+| `UPDATE_INSTANCE_INFO` / `QUEST_LOG_UPDATE` (registered under pcall) and empty reads of `GetNumSavedInstances` / `C_QuestLog.GetAllCompletedQuestIDs` / `GetNumQuestLogEntries` before the data loads or at logout | **unverified on Forever**: that both events fire at login (the addon never calls `RequestRaidInfo()`; the Blizzard UI does when the Raid tab opens), and that the reads come back empty before them, during an outage or at logout. `/rl probe` prints a `char cache:` line (cached counts, whether each event arrived) | without the events an empty quest log / lockout list is never trusted: the last one read this session is sent; with nothing read, `[]` (lockouts, quest log) or no `completed` key |
 | `## IconTexture` + uncompressed 32-bit TGA textures | Ledger Link shows its icon in the AddOns list (not the red "?"); the minimap button shows the round icon | default "?" icon / blank minimap button |
 | `UICheckButtonTemplate`, `Interface\\ChatFrame\\ChatFrameBackground` (window fill), minimap textures (`MiniMap-TrackingBorder`, `UI-Minimap-Background`, `UI-Minimap-ZoomButton-Highlight`), `GetCursorPosition` | the panel checkbox and the minimap button look right and drag | cosmetic only |
 | `BackdropTemplate`, `UIPanelScrollFrameTemplate`, `UIPanelButtonTemplate`, `UIPanelCloseButton` | the export window looks right | falls back to a plain frame (no border) |
