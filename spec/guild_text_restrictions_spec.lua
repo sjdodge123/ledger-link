@@ -19,6 +19,10 @@ describe("guild text reads under addon restrictions", function()
 
     before_each(function()
         ns = loadAddon()
+        -- The guild text has loaded (spec/guild_text_loaded_spec.lua), but
+        -- start from nothing read.
+        ns.Guild.OnEvent("GUILD_ROSTER_UPDATE")
+        ns.Guild.cache = nil
         for k, v in pairs(_G.C_GuildInfo) do saved[k] = v end
         calls = { GetMOTD = 0, GetInfoText = 0 }
         readers = {}

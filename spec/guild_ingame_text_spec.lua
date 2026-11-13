@@ -52,7 +52,12 @@ describe("guild export: in-game Message of the Day and Guild Information", funct
     local ns
     local readers = {}
     for k, v in pairs(_G.C_GuildInfo) do readers[k] = v end
-    before_each(function() ns = loadAddon() end)
+    before_each(function()
+        ns = loadAddon()
+        -- The server has sent the guild data, so the text has loaded
+        -- (spec/guild_text_loaded_spec.lua covers before it has).
+        ns.Guild.OnEvent("GUILD_ROSTER_UPDATE")
+    end)
     -- Tests below remove or replace the client's readers: put them back.
     after_each(function()
         _G.C_GuildInfo = {}
