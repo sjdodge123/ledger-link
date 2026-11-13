@@ -102,6 +102,17 @@ describe("char export: blank reads never replace data read earlier", function()
             assert.same({}, d.payload.data.quests.inProgress)
         end)
 
+        it("re-reads the log on every QUEST_LOG_UPDATE, even inside the scan throttle", function()
+            ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
+            ns.Char.OnEvent("QUEST_LOG_UPDATE") -- completed scan + log
+            log = {} -- the last quest turned in a second later
+            WowStub.state.serverTime = WowStub.state.serverTime + 1
+            ns.Char.OnEvent("QUEST_LOG_UPDATE") -- throttled scan, log still read
+            assert.same({}, ns.Char.cache.inProgress)
+            ns.Char.OnEvent("PLAYER_LEAVING_WORLD")
+            assert.same({}, logoutChar(ns).quests.inProgress)
+        end)
+
         it("never trusts an empty log read while leaving the world", function()
             ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
             ns.Char.OnEvent("QUEST_LOG_UPDATE")

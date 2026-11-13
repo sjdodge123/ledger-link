@@ -269,6 +269,15 @@ end
 --- always; the quest log when non-empty, or empty after QUEST_LOG_UPDATE this
 --- session while in the world. An empty completed read is never trusted: the
 --- cached list, else "no opinion" (Char.OMIT_UNKNOWN_COMPLETED) or `[]`.
+-- The live quest log, kept in the cache; the cached log for an untrusted empty read.
+local function questLogOrCached(inProgress)
+    if #inProgress > 0 or (Char.loaded.questLog and not leavingWorld) then
+        Char.cache.inProgress = inProgress
+        return inProgress
+    end
+    return Char.cache.inProgress or inProgress
+end
+
 function Char.QuestsOrCached()
     local quests, total = Char.Quests()
     if not quests then return nil end
@@ -280,11 +289,7 @@ function Char.QuestsOrCached()
     elseif Char.OMIT_UNKNOWN_COMPLETED then
         quests.completed = nil
     end
-    if #quests.inProgress > 0 or (Char.loaded.questLog and not leavingWorld) then
-        cache.inProgress = quests.inProgress
-    elseif cache.inProgress then
-        quests.inProgress = cache.inProgress
-    end
+    quests.inProgress = questLogOrCached(quests.inProgress)
     return quests, total
 end
 
@@ -319,7 +324,9 @@ local REFRESH = {
     UPDATE_INSTANCE_INFO = { lockouts = true, loaded = "instanceInfo" },
 }
 
---- Throttle for the quest refresh (QUEST_LOG_UPDATE fires often).
+--- Throttle for the completed-quest scan on QUEST_LOG_UPDATE (it fires
+--- often; the scan sorts thousands of ids). The quest log itself is re-read
+--- on every one, so a log emptied by the last turn-in is never missed.
 Char.QUEST_REFRESH_SECONDS = 10
 local questsReadAt
 
@@ -340,6 +347,8 @@ function Char.OnEvent(event)
         if not what.loaded or not questsReadAt or now - questsReadAt >= Char.QUEST_REFRESH_SECONDS then
             questsReadAt = now
             Char.QuestsOrCached()
+        elseif type(C_QuestLog) == "table" then
+            questLogOrCached(questLog())
         end
     end
 end
