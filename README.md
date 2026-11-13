@@ -45,8 +45,8 @@ the whole character snapshot on import: an empty read before the game has sent
 them, during an outage or at logout would wipe what Raid Ledger stored
 (`completed: []` means "no quests completed"). An empty completed-quest list is
 never trusted. An empty quest log or lockout list is trusted only after
-`QUEST_LOG_UPDATE` / `UPDATE_INSTANCE_INFO` this session, and never while
-leaving the world; otherwise the last list read is sent (lockouts that have
+`QUEST_LOG_UPDATE` / `UPDATE_INSTANCE_INFO` since the last loading screen,
+and never while leaving the world; otherwise the last list read is sent (lockouts that have
 reset since are dropped). With nothing read this session the empty list still
 goes out (`lockouts` is a required key; `completed` can be left out only once
 `Char.OMIT_UNKNOWN_COMPLETED` is on, which needs Raid Ledger ROK-2125 on the

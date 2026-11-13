@@ -204,7 +204,7 @@ end
 -- outage export wiped a guild's stored text the same way) would wipe what it
 -- stored: `completed: []` means "has completed no quests". An empty quest log
 -- or lockout list is common in play, so an empty read of those is trusted
--- only once the game has sent that data this session (QUEST_LOG_UPDATE /
+-- only once the game has sent that data since the last loading screen (QUEST_LOG_UPDATE /
 -- UPDATE_INSTANCE_INFO) and only while in the world.
 Char.cache = {}
 
@@ -214,7 +214,7 @@ Char.cache = {}
 --- false: send the empty read as `[]`, as before.
 Char.OMIT_UNKNOWN_COMPLETED = false
 
--- Whether the game has sent this data this session (never persisted).
+-- Whether the game has sent this data since the last loading screen (never persisted).
 Char.loaded = { questLog = false, instanceInfo = false }
 -- Between PLAYER_LEAVING_WORLD and PLAYER_ENTERING_WORLD (loading screen,
 -- logout or a disconnect) an empty read is never trusted.
@@ -247,7 +247,7 @@ function Char.TalentsOrCached()
 end
 
 --- Live lockouts, kept in the cache; an empty read is trusted only after
---- UPDATE_INSTANCE_INFO this session and while in the world, else the cached
+--- UPDATE_INSTANCE_INFO since the last loading screen, else the cached
 --- lockouts that have not reset yet (else the empty read: the key is required).
 function Char.LockoutsOrCached()
     local lockouts = Char.Lockouts()
@@ -334,7 +334,10 @@ function Char.OnEvent(event)
     local what = REFRESH[event]
     if not what then return end
     if event == "PLAYER_ENTERING_WORLD" then leavingWorld = false end
-    if event == "PLAYER_LEAVING_WORLD" then leavingWorld = true end
+    if event == "PLAYER_LEAVING_WORLD" then
+        -- After the loading screen the data must be confirmed again.
+        leavingWorld, Char.loaded.questLog, Char.loaded.instanceInfo = true, false, false
+    end
     if what.loaded then
         if leavingWorld then return end
         Char.loaded[what.loaded] = true

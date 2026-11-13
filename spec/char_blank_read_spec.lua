@@ -174,6 +174,17 @@ describe("char export: blank reads never replace data read earlier", function()
             assert.equal(249, lockouts[1].instanceId)
         end)
 
+        it("needs a fresh UPDATE_INSTANCE_INFO after a loading screen", function()
+            ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
+            ns.Char.OnEvent("UPDATE_INSTANCE_INFO")
+            ns.Char.OnEvent("PLAYER_LEAVING_WORLD")
+            WowStub.state.lockouts = {} -- still empty right after the loading screen
+            ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
+            assert.equal(1, #charData(ns).payload.data.lockouts)
+            ns.Char.OnEvent("UPDATE_INSTANCE_INFO")
+            assert.same({}, charData(ns).payload.data.lockouts)
+        end)
+
         it("ignores UPDATE_INSTANCE_INFO while leaving the world", function()
             ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
             ns.Char.OnEvent("PLAYER_LEAVING_WORLD")
