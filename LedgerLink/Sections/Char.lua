@@ -208,11 +208,13 @@ end
 -- UPDATE_INSTANCE_INFO) and only while in the world.
 Char.cache = {}
 
---- ROK-2125 (Raid Ledger): `quests` without `completed` = "no opinion". Only
---- a server carrying ROK-2125 accepts it (an older one rejects the string).
+--- ROK-2125 (Raid Ledger): `quests` without `completed` = "no opinion"; the
+--- server carries the list it stored. Only a server carrying ROK-2125
+--- accepts it (an older one rejects the string); prod has it since
+--- 2026-11-13 (`raid-ledger:main` built from 5a05c74).
 --- true: with no completed list read this session, leave `completed` out.
---- false: send the empty read as `[]`, as before.
-Char.OMIT_UNKNOWN_COMPLETED = false
+--- false: send the empty read as `[]`.
+Char.OMIT_UNKNOWN_COMPLETED = true
 
 -- Whether the game has sent this data since the last loading screen (never persisted).
 Char.loaded = { questLog = false, instanceInfo = false }

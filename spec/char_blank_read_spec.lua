@@ -38,10 +38,7 @@ describe("char export: blank reads never replace data read earlier", function()
             GetQuestObjectives = function() return {} end,
         }
     end)
-    after_each(function()
-        _G.C_QuestLog = nil
-        ns.Char.OMIT_UNKNOWN_COMPLETED = false
-    end)
+    after_each(function() _G.C_QuestLog = nil end)
 
     it("registers QUEST_LOG_UPDATE and UPDATE_INSTANCE_INFO", function()
         assert.is_true(ns.Char.frame.events.QUEST_LOG_UPDATE)
@@ -62,15 +59,16 @@ describe("char export: blank reads never replace data read earlier", function()
             assert.same({ 6, 456, 457, 900 }, charData(ns).payload.data.quests.completed)
         end)
 
-        it("with nothing read this session: sends [] (pre-ROK-2125 servers need the key)", function()
+        it("with nothing read this session and OMIT_UNKNOWN_COMPLETED off: sends []", function()
+            ns.Char.OMIT_UNKNOWN_COMPLETED = false -- a server without ROK-2125 needs the key
             completed = {}
             local d = charData(ns)
             assert.same({}, d.payload.data.quests.completed)
             assert.truthy(d.json:find('"completed":[]', 1, true))
         end)
 
-        it("with nothing read this session and OMIT_UNKNOWN_COMPLETED: leaves `completed` out", function()
-            ns.Char.OMIT_UNKNOWN_COMPLETED = true
+        it("with nothing read this session: leaves `completed` out (ROK-2125, the default)", function()
+            assert.is_true(ns.Char.OMIT_UNKNOWN_COMPLETED)
             completed = {}
             local d = charData(ns)
             assert.is_nil(d.json:find('"completed"', 1, true))
@@ -85,6 +83,15 @@ describe("char export: blank reads never replace data read earlier", function()
             completed = {}
             ns.Char.OnEvent("PLAYER_LEAVING_WORLD")
             assert.same({ 6, 456, 457 }, logoutChar(ns).quests.completed)
+        end)
+
+        it("leaves `completed` out of a logout export when nothing was read this session (outage)", function()
+            completed = {}
+            ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
+            ns.Char.OnEvent("PLAYER_LEAVING_WORLD")
+            local q = logoutChar(ns).quests
+            assert.is_nil(q.completed)
+            assert.is_table(q.inProgress)
         end)
 
         it("keeps the truncation flag with the cached list", function()
@@ -197,12 +204,12 @@ describe("char export: blank reads never replace data read earlier", function()
 
     it("says in /rl probe what is cached and whether the data loaded", function()
         assert.equal("char cache: completed quests = none; quest log = none (QUEST_LOG_UPDATE no); "
-            .. "lockouts = none (UPDATE_INSTANCE_INFO no); unknown completed = sent as []", ns.Probe.CharCacheLine())
+            .. "lockouts = none (UPDATE_INSTANCE_INFO no); unknown completed = left out", ns.Probe.CharCacheLine())
         ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
         ns.Char.OnEvent("UPDATE_INSTANCE_INFO")
         local line = ns.Probe.CharCacheLine()
         assert.equal("char cache: completed quests = 3 ids; quest log = 1 quests (QUEST_LOG_UPDATE no); "
-            .. "lockouts = 1 lockouts (UPDATE_INSTANCE_INFO yes); unknown completed = sent as []", line)
+            .. "lockouts = 1 lockouts (UPDATE_INSTANCE_INFO yes); unknown completed = left out", line)
         assert.truthy(ns.Probe.Report():find(line, 1, true))
     end)
 end)
