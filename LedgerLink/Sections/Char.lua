@@ -154,10 +154,7 @@ local function objectives(questId)
     return out
 end
 
---- Completed quest ids (ascending, capped) + the quest log. nil without
---- C_QuestLog, so the key is simply absent.
-function Char.Quests()
-    if type(C_QuestLog) ~= "table" then return nil end
+local function completedIds()
     local all = {}
     for _, id in ipairs(ns.SafeCall(C_QuestLog.GetAllCompletedQuestIDs) or {}) do
         local v = ns.AsId(id)
@@ -166,7 +163,10 @@ function Char.Quests()
     table.sort(all)
     local completed = Json.array()
     for i = 1, math.min(#all, Char.QUESTS_COMPLETED_MAX) do completed[i] = all[i] end
+    return completed, #all
+end
 
+local function questLog()
     local inProgress = Json.array()
     local entries = ns.AsId(ns.SafeCall(C_QuestLog.GetNumQuestLogEntries)) or 0
     for i = 1, math.min(entries, 200) do
@@ -178,23 +178,47 @@ function Char.Quests()
                 objectives = objectives(questId) }
         end
     end
+    return inProgress
+end
 
-    local quests = { completed = completed, inProgress = inProgress }
-    if #all > Char.QUESTS_COMPLETED_MAX then
-        quests.completedTruncated = true
-        ns.Print(string.format("You have %d completed quests; Raid Ledger keeps %d, so the lowest %d ids were exported.",
-            #all, Char.QUESTS_COMPLETED_MAX, Char.QUESTS_COMPLETED_MAX))
-    end
-    return quests
+--- Completed quest ids (ascending, capped) + the quest log, as the client
+--- answers right now. nil without C_QuestLog, so the key is simply absent.
+--- `total` = how many completed ids the client returned (before the cap).
+function Char.Quests()
+    if type(C_QuestLog) ~= "table" then return nil end
+    local completed, total = completedIds()
+    local quests = { completed = completed, inProgress = questLog() }
+    if total > Char.QUESTS_COMPLETED_MAX then quests.completedTruncated = true end
+    return quests, total
 end
 
 -- Gear + talents cache for the logout auto-export (Outbox.lua). At
 -- PLAYER_LOGOUT the inventory and talent APIs already return nothing, so every
 -- logout export sent `gear: []` and empty talents (2026-11-07). The last
 -- non-empty read while playing is kept (this session only, in memory) and used
--- when the live read comes back empty. An empty read never replaces it: Raid
--- Ledger treats an empty gear list as "nothing to store" anyway.
+-- when the live read comes back empty. An empty read never replaces it.
+--
+-- Completed quests, the quest log and lockouts are cached the same way. Raid
+-- Ledger replaces the whole char snapshot on import, so an empty list read
+-- before the data loaded, during an outage or at logout (2026-11-13: an
+-- outage export wiped a guild's stored text the same way) would wipe what it
+-- stored: `completed: []` means "has completed no quests". An empty quest log
+-- or lockout list is common in play, so an empty read of those is trusted
+-- only once the game has sent that data this session (QUEST_LOG_UPDATE /
+-- UPDATE_INSTANCE_INFO) and only while in the world.
 Char.cache = {}
+
+--- ROK-2125 (Raid Ledger): `quests` without `completed` = "no opinion". Only
+--- a server carrying ROK-2125 accepts it (an older one rejects the string).
+--- true: with no completed list read this session, leave `completed` out.
+--- false: send the empty read as `[]`, as before.
+Char.OMIT_UNKNOWN_COMPLETED = false
+
+-- Whether the game has sent this data this session (never persisted).
+Char.loaded = { questLog = false, instanceInfo = false }
+-- Between PLAYER_LEAVING_WORLD and PLAYER_ENTERING_WORLD (loading screen,
+-- logout or a disconnect) an empty read is never trusted.
+local leavingWorld = false
 
 -- Nodes, not just a config id: a config id with no readable nodes is the
 -- trait APIs not answering yet, and must not replace a populated cache.
@@ -222,12 +246,62 @@ function Char.TalentsOrCached()
     return Char.cache.talents or talents
 end
 
+--- Live lockouts, kept in the cache; an empty read is trusted only after
+--- UPDATE_INSTANCE_INFO this session and while in the world, else the cached
+--- lockouts that have not reset yet (else the empty read: the key is required).
+function Char.LockoutsOrCached()
+    local lockouts = Char.Lockouts()
+    if #lockouts > 0 or (Char.loaded.instanceInfo and not leavingWorld) then
+        Char.cache.lockouts = lockouts
+        return lockouts
+    end
+    local cached = Char.cache.lockouts
+    if not cached then return lockouts end
+    local now = ns.SafeCall(GetServerTime) or time()
+    local live = Json.array()
+    for _, row in ipairs(cached) do
+        if row.resetAt > now then live[#live + 1] = row end
+    end
+    return live
+end
+
+--- Live quests, with each part kept in the cache: a non-empty completed list
+--- always; the quest log when non-empty, or empty after QUEST_LOG_UPDATE this
+--- session while in the world. An empty completed read is never trusted: the
+--- cached list, else "no opinion" (Char.OMIT_UNKNOWN_COMPLETED) or `[]`.
+function Char.QuestsOrCached()
+    local quests, total = Char.Quests()
+    if not quests then return nil end
+    local cache = Char.cache
+    if total > 0 then
+        cache.completed = { ids = quests.completed, truncated = quests.completedTruncated }
+    elseif cache.completed then
+        quests.completed, quests.completedTruncated = cache.completed.ids, cache.completed.truncated
+    elseif Char.OMIT_UNKNOWN_COMPLETED then
+        quests.completed = nil
+    end
+    if #quests.inProgress > 0 or (Char.loaded.questLog and not leavingWorld) then
+        cache.inProgress = quests.inProgress
+    elseif cache.inProgress then
+        quests.inProgress = cache.inProgress
+    end
+    return quests, total
+end
+
+local function reportTruncated(quests, total)
+    if total and total > Char.QUESTS_COMPLETED_MAX then
+        ns.Print(string.format("You have %d completed quests; Raid Ledger keeps %d, so the lowest %d ids were exported.",
+            total, Char.QUESTS_COMPLETED_MAX, Char.QUESTS_COMPLETED_MAX))
+    end
+    return quests
+end
+
 function Char.Build()
     return {
         gear = Char.GearOrCached(),
         talents = Char.TalentsOrCached(),
-        lockouts = Char.Lockouts(),
-        quests = Char.Quests(),
+        lockouts = Char.LockoutsOrCached(),
+        quests = reportTruncated(Char.QuestsOrCached()),
         mailworthy = ns.Mailworthy.Block(), -- nil (no key) without Mailworthy or a guild
     }
 end
@@ -235,18 +309,39 @@ end
 -- Refresh the cache on the events where the APIs answer. TRAIT_CONFIG_UPDATED
 -- and PLAYER_TALENT_UPDATE may not exist on Forever: registered under pcall.
 local REFRESH = {
-    PLAYER_ENTERING_WORLD = { gear = true, talents = true },
-    PLAYER_LEAVING_WORLD = { gear = true, talents = true }, -- the last read before logout
+    PLAYER_ENTERING_WORLD = { gear = true, talents = true, quests = true, lockouts = true },
+    -- The last read before logout (an empty quest / lockout read is not trusted here).
+    PLAYER_LEAVING_WORLD = { gear = true, talents = true, quests = true, lockouts = true },
     PLAYER_EQUIPMENT_CHANGED = { gear = true },
     TRAIT_CONFIG_UPDATED = { talents = true },
     PLAYER_TALENT_UPDATE = { talents = true },
+    QUEST_LOG_UPDATE = { quests = true, loaded = "questLog" },
+    UPDATE_INSTANCE_INFO = { lockouts = true, loaded = "instanceInfo" },
 }
+
+--- Throttle for the quest refresh (QUEST_LOG_UPDATE fires often).
+Char.QUEST_REFRESH_SECONDS = 10
+local questsReadAt
 
 function Char.OnEvent(event)
     local what = REFRESH[event]
     if not what then return end
+    if event == "PLAYER_ENTERING_WORLD" then leavingWorld = false end
+    if event == "PLAYER_LEAVING_WORLD" then leavingWorld = true end
+    if what.loaded then
+        if leavingWorld then return end
+        Char.loaded[what.loaded] = true
+    end
     if what.gear then Char.GearOrCached() end
     if what.talents then Char.TalentsOrCached() end
+    if what.lockouts then Char.LockoutsOrCached() end
+    if what.quests then
+        local now = ns.SafeCall(GetServerTime) or time()
+        if not what.loaded or not questsReadAt or now - questsReadAt >= Char.QUEST_REFRESH_SECONDS then
+            questsReadAt = now
+            Char.QuestsOrCached()
+        end
+    end
 end
 
 local events = CreateFrame("Frame")
