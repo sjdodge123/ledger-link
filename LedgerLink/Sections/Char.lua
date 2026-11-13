@@ -344,7 +344,9 @@ function Char.OnEvent(event)
     if what.lockouts then Char.LockoutsOrCached() end
     if what.quests then
         local now = ns.SafeCall(GetServerTime) or time()
-        if not what.loaded or not questsReadAt or now - questsReadAt >= Char.QUEST_REFRESH_SECONDS then
+        -- Unthrottled until a completed list is cached: never skip the first good read.
+        if not what.loaded or not Char.cache.completed or not questsReadAt
+            or now - questsReadAt >= Char.QUEST_REFRESH_SECONDS then
             questsReadAt = now
             Char.QuestsOrCached()
         elseif type(C_QuestLog) == "table" then

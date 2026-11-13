@@ -77,6 +77,16 @@ describe("char export: blank reads never replace data read earlier", function()
             assert.is_table(d.payload.data.quests.inProgress) -- `quests` stays, so the server carries its list
         end)
 
+        it("never throttles away the first non-empty read", function()
+            completed = {}
+            ns.Char.OnEvent("PLAYER_ENTERING_WORLD") -- empty: nothing cached
+            completed = { 6, 456, 457 }
+            ns.Char.OnEvent("QUEST_LOG_UPDATE") -- same second: still scanned
+            completed = {}
+            ns.Char.OnEvent("PLAYER_LEAVING_WORLD")
+            assert.same({ 6, 456, 457 }, logoutChar(ns).quests.completed)
+        end)
+
         it("keeps the truncation flag with the cached list", function()
             ns.Char.QUESTS_COMPLETED_MAX = 2
             ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
