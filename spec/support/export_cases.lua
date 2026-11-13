@@ -118,6 +118,7 @@ local cases = {
     -- then the client drops them at PLAYER_LOGOUT (2026-11-07 bug).
     { name = "all-logout-from-cache", section = "all", setup = function(ns)
         raidPulls(ns, 1, 25)
+        ns.Guild.OnEvent("GUILD_ROSTER_UPDATE") -- the guild text loaded while playing
         ns.Guild.OnEvent("PLAYER_ENTERING_WORLD")
         ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
         ns.Guild.OnEvent("PLAYER_LEAVING_WORLD")
@@ -140,6 +141,8 @@ local cases = {
 local function run(case)
     local ns = loadAddon()
     case.setup(ns)
+    -- The server has sent the guild data (the guild text is only sent once it has).
+    ns.Guild.OnEvent("GUILD_ROSTER_UPDATE")
     if case.section == "all" then return assert(ns.Export.RunAll()) end
     return assert(ns.Export.RunPages(case.section))
 end

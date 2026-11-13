@@ -259,10 +259,13 @@ describe("/rl probe logout cache line", function()
         ns.Char.OnEvent("PLAYER_ENTERING_WORLD")
         local line = ns.Probe.CacheLine()
         assert.truthy(line:find("guild = Night Shift, 3 members as of ", 1, true))
-        assert.truthy(line:find(", motd 77 bytes, info 95 bytes; gear = 2 items; talents = 3 nodes", 1, true))
+        -- The server has not sent the guild text yet: nothing read.
+        assert.truthy(line:find(", motd unread, info unread; gear = 2 items; talents = 3 nodes", 1, true))
         assert.truthy(ns.Probe.Report():find(line, 1, true))
-        WowStub.state.guildMotd, WowStub.state.guildInfoText = "", nil
+        ns.Guild.OnEvent("GUILD_MOTD", "Raid Thursday")
+        assert.truthy(ns.Probe.CacheLine():find(", motd 77 bytes, info 95 bytes; gear = ", 1, true))
+        WowStub.state.guildMotd, WowStub.state.guildInfoText = "Farm night", nil
         ns.Guild.OnEvent("PLAYER_LEAVING_WORLD")
-        assert.truthy(ns.Probe.CacheLine():find(", motd 0 bytes, info unread; gear = ", 1, true))
+        assert.truthy(ns.Probe.CacheLine():find(", motd 10 bytes, info unread; gear = ", 1, true))
     end)
 end)

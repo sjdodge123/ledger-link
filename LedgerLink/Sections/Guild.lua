@@ -155,13 +155,58 @@ local function textReadable()
     return not textBlockedAt or now - textBlockedAt >= Guild.TEXT_RETRY_SECONDS
 end
 
--- motd, infoText: read now when allowed. A box not read because of a
--- restriction or a block keeps the text last read for this guild this session;
--- a read that ran and failed leaves it out (see readBox).
+local function inGuildNow()
+    local inGuild = ns.SafeCall(IsInGuild)
+    if inGuild == nil then inGuild = ns.SafeCall(GetGuildInfo, "player") end
+    return inGuild ~= nil and inGuild ~= false
+end
+
+local function liveName()
+    local name = ns.Clip(ns.SafeCall(GetGuildInfo, "player"), 64)
+    if name and name ~= "" then return name end
+    return nil
+end
+
+-- Whether the server has sent this guild's text this session. Until it has,
+-- GetMOTD / GetInfoText read "" (2026-11-13: during a Blizzard outage an
+-- export sent motd = "" and infoText = "" and Raid Ledger wiped the guild's
+-- stored text), so both keys are left out. Set by GUILD_MOTD (any text, ""
+-- included: an officer cleared it) or by a GUILD_ROSTER_UPDATE with a
+-- populated roster, while IsInGuild() and GetGuildInfo("player") names the
+-- guild. A GUILD_ROSTER_UPDATE with an empty roster or leaving the guild clears
+-- it; so does a different guild name. Never persisted: a /reload or a relog
+-- (after a disconnect) starts unloaded.
+local textLoadedFor, textLoadedBy
+
+local function markTextLoaded(signal)
+    local name = inGuildNow() and liveName() or nil
+    if name then textLoadedFor, textLoadedBy = name, signal end
+end
+
+local function textLoaded(guildName)
+    return textLoadedFor ~= nil and textLoadedFor == guildName and inGuildNow()
+end
+
+--- `/rl probe` line: whether the guild text gate is open, and what opened it.
+function Guild.TextStateLine()
+    local name = liveName()
+    if name and textLoaded(name) then return "guild text: loaded (" .. textLoadedBy .. ")" end
+    return "guild text: not loaded (motd / infoText left out until GUILD_MOTD or a populated GUILD_ROSTER_UPDATE)"
+end
+
+-- Between PLAYER_LEAVING_WORLD and PLAYER_ENTERING_WORLD (loading screen or
+-- logout) the guild APIs may read "no guild": that is not leaving it.
+local leavingWorld = false
+
+-- motd, infoText: read now when the text has loaded and reads are allowed. A
+-- box not read (not loaded yet, a restriction or a block) keeps the text last
+-- read for this guild this session; a read that ran and failed leaves it out
+-- (see readBox). While leaving the world (logout, or a disconnect) a "" read
+-- is not trusted either: it keeps the text last read, or is left out.
 local function readBoxes(guildName)
     local motd, infoText
     local motdTried, infoTried = false, false
-    if textReadable() then
+    if textLoaded(guildName) and textReadable() then
         local blocked
         motd, blocked = readBox("GetMOTD", "GetGuildRosterMOTD", Guild.MAX_MOTD)
         motdTried = not blocked
@@ -174,6 +219,10 @@ local function readBoxes(guildName)
     if last and last.name == guildName then
         if not motdTried then motd = last.motd end
         if not infoTried then infoText = last.infoText end
+    end
+    if leavingWorld then
+        if motd == "" then motd = last and last.name == guildName and last.motd or nil end
+        if infoText == "" then infoText = last and last.name == guildName and last.infoText or nil end
     end
     return motd, infoText
 end
@@ -217,9 +266,6 @@ Guild.cache = nil
 --- Background refreshes on GUILD_ROSTER_UPDATE run at most this often.
 Guild.REFRESH_SECONDS = 10
 local refreshedAt
--- Between PLAYER_LEAVING_WORLD and PLAYER_ENTERING_WORLD (loading screen or
--- logout) the guild APIs may read "no guild": that is not leaving it.
-local leavingWorld = false
 
 --- Read the roster quietly and keep it, when the client has one. `force`
 --- skips the REFRESH_SECONDS throttle.
@@ -230,18 +276,6 @@ function Guild.Refresh(force)
     if not data then return false end
     Guild.cache, refreshedAt = data, now
     return true
-end
-
-local function inGuildNow()
-    local inGuild = ns.SafeCall(IsInGuild)
-    if inGuild == nil then inGuild = ns.SafeCall(GetGuildInfo, "player") end
-    return inGuild ~= nil and inGuild ~= false
-end
-
-local function liveName()
-    local name = ns.Clip(ns.SafeCall(GetGuildInfo, "player"), 64)
-    if name and name ~= "" then return name end
-    return nil
 end
 
 -- The client names a different guild than the cached roster's: the player
@@ -327,17 +361,30 @@ local function reconcile()
         Guild.Refresh(true)
     else
         Guild.cache, refreshedAt = nil, nil
+        textLoadedFor, textLoadedBy = nil, nil
     end
 end
 
 function Guild.OnEvent(event, unit)
     if event == "GUILD_ROSTER_UPDATE" then
-        if not leavingWorld then Guild.Refresh(false) end
+        if not leavingWorld then
+            if rosterCount() > 0 then
+                markTextLoaded("GUILD_ROSTER_UPDATE")
+            else
+                textLoadedFor, textLoadedBy = nil, nil -- the client dropped the guild data
+            end
+            Guild.Refresh(false)
+        end
         if pending then
             local done = pending
             pending = nil
             done()
         end
+    elseif event == "GUILD_MOTD" then
+        -- The server sent the Message of the Day ("" = an officer cleared it).
+        if leavingWorld then return end
+        markTextLoaded("GUILD_MOTD")
+        Guild.Refresh(true)
     elseif event == "PLAYER_GUILD_UPDATE" then
         if leavingWorld or (unit ~= nil and unit ~= "player") then return end
         reconcile()
@@ -347,15 +394,15 @@ function Guild.OnEvent(event, unit)
         leavingWorld = false
         reconcile()
     elseif event == "PLAYER_LEAVING_WORLD" then
+        leavingWorld = true -- first: this read must not trust a "" text (readBoxes)
         Guild.Refresh(true) -- the last chance to read it before logout
-        leavingWorld = true
     end
 end
 
 local events = CreateFrame("Frame")
 Guild.frame = events
 events:RegisterEvent("GUILD_ROSTER_UPDATE")
-for _, event in ipairs({ "PLAYER_GUILD_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_LEAVING_WORLD" }) do
+for _, event in ipairs({ "GUILD_MOTD", "PLAYER_GUILD_UPDATE", "PLAYER_ENTERING_WORLD", "PLAYER_LEAVING_WORLD" }) do
     pcall(events.RegisterEvent, events, event)
 end
 events:SetScript("OnEvent", function(_, event, unit) Guild.OnEvent(event, unit) end)
