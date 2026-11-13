@@ -26,3 +26,4 @@ Minimap.lua
 Sections\Char.lua
 Sections\Guild.lua
 Sections\Raid.lua
+Sections\Loot.lua

@@ -63,6 +63,8 @@ local function defaultState()
         numGroupMembers = 0,
         units = {},
         instance = { "Molten Core", "raid", 9, "40 Player", 40, 0, false, 409 },
+        -- loot (contract v2 draft): C_PartyInfo.GetLootMethod() (Enum.LootMethod) + GetLootThreshold()
+        lootMethod = 2, lootThreshold = 2,
         -- dev snapshot (ROK-2072): debugprofilestop() advances by clockStepMs per call
         clockMs = 0, clockStepMs = 0,
         tocInterface = "16001",
@@ -111,6 +113,14 @@ function WowStub.reset()
     _G.MailworthyAPI = nil -- the Mailworthy addon: absent unless a test installs it
     if _G.C_Traits then _G.C_Traits.GetEntryInfo, _G.C_Traits.GetDefinitionInfo = nil, nil end
     if _G.Enum then _G.Enum.GameRule = nil end
+    _G.issecretvalue = nil -- tests that need it set their own
+    -- enUS GlobalStrings the loot recorder matches loot lines with.
+    _G.LOOT_ITEM = "%s receives loot: %s."
+    _G.LOOT_ITEM_MULTIPLE = "%s receives loot: %sx%d."
+    _G.LOOT_ITEM_SELF = "You receive loot: %s."
+    _G.LOOT_ITEM_SELF_MULTIPLE = "You receive loot: %sx%d."
+    _G.LOOT_ROLL_WON = "%s won: %s"
+    _G.LOOT_ROLL_YOU_WON = "You won: %s"
 end
 WowStub.reset()
 
@@ -166,6 +176,10 @@ _G.C_GuildInfo = {
 _G.GetNumGroupMembers = function() return s().numGroupMembers end
 _G.IsInRaid = function() return s().inRaid end
 _G.GetInstanceInfo = function() return unpack(s().instance, 1, 8) end
+_G.IsInGroup = function() return s().numGroupMembers > 0 end
+_G.IsInInstance = function() local kind = s().instance[2] return kind ~= "none", kind end
+_G.C_PartyInfo = { GetLootMethod = function() return s().lootMethod end }
+_G.GetLootThreshold = function() return s().lootThreshold end
 _G.GetServerTime = function() return s().serverTime end
 _G.InCombatLockdown = function() return s().inCombat end
 _G.C_RestrictedActions = {
@@ -196,6 +210,7 @@ _G.Enum = {
     CompressionMethod = { Deflate = 0, Zlib = 1, Gzip = 2 },
     CompressionLevel = { Default = 0, OptimizeForSpeed = 1, OptimizeForSize = 2 },
     AddOnRestrictionType = { Combat = 0, Encounter = 1, ChallengeMode = 2, PvPMatch = 3, Map = 4, Chat = 5 },
+    LootMethod = { Freeforall = 0, Roundrobin = 1, Masterlooter = 2, Group = 3, Needbeforegreed = 4, Personal = 5 },
 }
 _G.C_EncodingUtil = {
     CompressString = function(source, method)
