@@ -21,6 +21,9 @@ UI.lua
 ExportFrame.lua
 Probe.lua
 DevSnapshot.lua
+DevAllowlist.lua
+DevProbes.lua
+DevQueue.lua
 Panel.lua
 Minimap.lua
 Sections\Char.lua

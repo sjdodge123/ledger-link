@@ -24,6 +24,9 @@ function ns.Init()
     -- DevSnapshot.lua: repaired, never created (off by default = no `dev` key).
     if LedgerLinkDB.dev ~= nil and type(LedgerLinkDB.dev) ~= "table" then LedgerLinkDB.dev = nil end
     if LedgerLinkDB.dev and type(LedgerLinkDB.dev.snapshots) ~= "table" then LedgerLinkDB.dev.snapshots = {} end
+    if LedgerLinkDB.dev and type(LedgerLinkDB.dev.probes) ~= "table" then LedgerLinkDB.dev.probes = {} end
+    -- DevProbes.lua: the Companion's probe queue (DevQueue.lua) is read here, and only in dev mode.
+    if ns.DevProbes then ns.DevProbes.Load() end
     if ns.Minimap then ns.Minimap.Init() end
 end
 
@@ -47,7 +50,7 @@ local HELP = {
     "/rl probe - beta checks in one copyable report (paste it to the addon developer)",
     "/rl minimap on|off - show or hide the minimap button",
     "/rl autoexport on|off - save an Export all on logout for the Raid Ledger Companion (default on)",
-    "/rl dev on|off - developer snapshot for the Raid Ledger Companion (default off)",
+    "/rl dev on|off - developer snapshot and probes for the Raid Ledger Companion (default off)",
     "Paste the string into Raid Ledger: your character -> Import string.",
 }
 
@@ -220,14 +223,15 @@ local function devCommand(arg)
     local dev = ns.DevSnapshot
     if arg == "on" then
         dev.SetEnabled(true)
-        ns.Print("Dev snapshot on: a diagnostic snapshot is saved on every /reload or logout for the Raid Ledger"
-            .. " Companion. /rl dev off removes it.")
+        ns.Print("Dev mode on: a diagnostic snapshot is saved on every /reload or logout for the Raid Ledger"
+            .. " Companion, and probes it queues run after a /reload. /rl dev off removes both.")
     elseif arg == "off" then
         dev.SetEnabled(false)
-        ns.Print("Dev snapshot off; saved snapshots removed.")
+        ns.Print("Dev mode off; saved snapshots and probe results removed.")
     else
-        ns.Print(dev.Enabled() and string.format("Dev snapshot on (%d character(s) saved). /rl dev off removes it.",
-            dev.Count()) or "Dev snapshot off. /rl dev on saves a diagnostic snapshot on every /reload or logout.")
+        ns.Print(dev.Enabled() and string.format("Dev mode on (%d character snapshot(s), %d probe result(s) saved)."
+            .. " /rl dev off removes them.", dev.Count(), ns.DevProbes.Count())
+            or "Dev mode off. /rl dev on saves a diagnostic snapshot and runs Companion probes.")
     end
 end
 

@@ -24,7 +24,7 @@ data, compresses it, and shows it in a box you copy from.
 /rl region us|eu|kr|tw|cn   override the region; only used when the game doesn't report one (beta), where it is otherwise guessed from the game language. Raid Ledger has no China region: cn exports won't import
 /rl status           last export times + recorded pull count
 /rl probe            all beta checks in one copyable report (for bug reports)
-/rl dev on|off       developer diagnostic snapshot for the Raid Ledger Companion (default off); /rl dev shows its state
+/rl dev on|off       developer snapshot + Companion probes for the Raid Ledger Companion (default off); /rl dev shows its state
 ```
 
 **Raid Ledger Companion (outbox).** Every export also keeps a copy in
@@ -64,6 +64,30 @@ are saved. The Raid Ledger Companion reads it from SavedVariables and keeps the
 latest plus 7 days of history on your own PC only (never uploaded to Raid
 Ledger), so a developer can query it over the Companion's local dev bridge
 instead of asking you to paste `/rl probe`.
+
+**Dev probes (`/rl dev`, Raid Ledger ROK-2190).** Dev mode also makes LedgerLink
+the developer tunnel into the game: there is no separate probe addon. A
+developer queues a read-only probe (a short list of WoW API calls) through the
+Companion's dev bridge; the Companion writes it into `LedgerLink/DevQueue.lua`
+(shipped as an empty stub with no assignment) as `RaidLedgerProbeQueue = [==[<JSON>]==]`. On each
+load (login or `/reload`) **with dev mode on**, LedgerLink reads that JSON (as
+data, never as code; with dev mode off it is never read), and runs each probe
+not yet answered and still within its `ttlHours` after its `after` event
+(`PLAYER_LOGIN`, `PLAYER_ENTERING_WORLD` or `GUILD_ROSTER_UPDATE`). Before
+**every** call, loop iterations included, the function is checked against the
+pinned allowlist (`contract/dev-bridge/v1/allowlist.json`, compiled into
+`DevAllowlist.lua` by `tools/gen_dev_allowlist.lua`): read verbs only
+(`Get`/`Is`/`Has`/`Can`/`Unit`/`Num`), deny list first; a refused call is
+answered `denied` and never made. Name-bearing functions (`UnitGUID`,
+`UnitName`, `GetGuildInfo`, ...) are presence only: a `fn` call to one is
+`denied`, `presence` reports its Lua type. Every call runs in `pcall`. The
+answer is `LedgerLinkDB.dev.probes[probeId]`, one dev-bridge/v1 `probe-result`
+JSON string: values nested at most 3 deep, ≤40 entries per table, ≤40 returns,
+each item ≤3 KiB and the whole ≤64 KiB (cut and marked `truncated`). At most 50
+are kept: expired ones (past their probe's `ttlHours`) go first, then the oldest.
+The client writes SavedVariables only at logout or `/reload`, so a probe queued
+while you play is **run** after one `/reload` and **reaches the Companion** at
+the next one (or at logout); chat says how many were answered.
 
 **Guild export.** Officer notes are never read or exported, whatever your rank
 (`canViewOfficerNote` is always `false`). Public notes are left out unless you
@@ -280,7 +304,13 @@ case (`spec/support/export_cases.lua`) against `contract/v1/schema.json`, and
 decodes `contract/v1/fixtures/` once Raid Ledger publishes them; that is the CI
 gate. `spec/dev_snapshot_spec.lua` validates a normal and a worst-case `/rl dev`
 snapshot against `contract/dev-bridge/v1/schema.json` `$defs/ledgerlink-snapshot`
-(`node tools/validate-contract.mjs --dev-bridge ledgerlink-snapshot <file>`). As an optional local cross-check, `tools/verify-with-raid-ledger.sh` decodes the strings
+(`node tools/validate-contract.mjs --dev-bridge ledgerlink-snapshot <file>`).
+`spec/dev_probes_spec.lua` round-trips every pinned probe fixture (the
+`probe-queue.json` queue loaded as the Lua file the Companion writes,
+`probe-request--max-size`, the probe-result fixtures and the invalid ones),
+checks the allowlist examples and tokenizer vectors, validates every result
+against `$defs/probe-result`, and fails when `LedgerLink/DevAllowlist.lua` is
+stale: after `tools/sync-contract.sh`, run `luajit tools/gen_dev_allowlist.lua`. As an optional local cross-check, `tools/verify-with-raid-ledger.sh` decodes the strings
 `tools/gen_strings.lua` generates (char, guild single + 3-page + 8-page +
 over-cap, raid) with Raid Ledger's actual server decoder
 (`RAID_LEDGER_DIR=<checkout>`; Export all strings need a checkout with
@@ -357,6 +387,7 @@ a clear "please report this" message), but none is confirmed on Forever yet:
 | Auction house deposits (2026-10-13, for a second addon) | the `S8 …` lines of `/rl probe`, run **with the auction house open**: for each tradeable bag stack (commodity or item), the deposit for 12h / 24h / 48h, whole stack and one unit (`C_AuctionHouse.CalculateItemDeposit` / `CalculateCommodityDeposit`) next to its vendor price | calculations only; nothing is posted |
 | Professions (2026-10-22, Raid Ledger ROK-1907 `char.professions`) | the `S9 …` lines of `/rl probe`, run on a character that has at least one profession: `GetProfessions()` slots and `GetProfessionInfo(index)` (name, skill, max, skillLine), `C_TradeSkillUI.GetProfessionInfoBySkillLineID(skillLine)`, and every `C_SkillInfo.GetSkillLineInfo` line (professions marked by SkillLine ID). One `S9 verdict: YES via <source>: Mining 75/150, …` line per source that worked, or `S9 verdict: NO` | discovery only; nothing is exported until Raid Ledger adds the field to the contract. Never expands a skill header |
 | `MailworthyAPI.v1.GetGuildExport(guildName)` (the Mailworthy addon, v0.31.0+; not a WoW API) | with Mailworthy installed and a guild template published, `/rl export char` and Raid Ledger's import preview: the guild hub's Guild contributions widget fills in after the import. Also at logout (the Companion outbox entry) | called under `pcall`; any problem leaves `data.mailworthy` out and the rest of the export is unchanged |
+| `/rl dev` probes: `DevQueue.lua` rewritten by the Companion is re-read on `/reload` (ROK-2190) | **unverified**: queue a probe with dev mode on, `/reload`: chat says `Answered 1 dev probe(s)`; `/reload` again and the Companion serves the result. The client re-reads addon files on `/reload` only when they existed at startup, hence the shipped stub | the probe stays queued until its TTL; nothing else changes |
 | SavedVariables reload bug (beta) | `/rl status` / `/rl raid` after a relog | status history and recorded pulls are empty; only this session's pulls export |
 
 ## Releases
