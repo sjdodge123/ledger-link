@@ -7,6 +7,7 @@
 --       v = 1, enabledAt = <unix s>,
 --       snapshots  = { [<player guid>] = "<ledgerlink-snapshot JSON>" },
 --       capturedAt = { [<player guid>] = <unix s> }, -- drives the oldest-first trim
+--       probes     = { [<probeId>] = "<probe-result JSON>" }, -- DevProbes.lua
 --   }
 --
 -- The format is Raid Ledger's (dev-bridge/v1 `ledgerlink-snapshot`). The JSON
@@ -74,7 +75,7 @@ function DevSnapshot.SetEnabled(on)
     if not on then
         LedgerLinkDB.dev = nil
     elseif not DevSnapshot.Enabled() then
-        LedgerLinkDB.dev = { v = 1, enabledAt = time(), snapshots = {}, capturedAt = {} }
+        LedgerLinkDB.dev = { v = 1, enabledAt = time(), snapshots = {}, capturedAt = {}, probes = {} }
     end
 end
 
@@ -120,6 +121,8 @@ local function jsonValue(v, depth, cut)
     end
     return out
 end
+-- DevProbes.lua stores probe-result values under the same rules.
+DevSnapshot.JsonValue = jsonValue
 
 local function client()
     local version, build, buildDate, interface = call("GetBuildInfo")

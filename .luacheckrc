@@ -5,6 +5,8 @@ exclude_files = { ".luarocks/**", ".install/**", "lua_modules/**", "node_modules
 -- Globals the addon defines (SavedVariables + slash command registration).
 globals = {
     "LedgerLinkDB", "LedgerLinkCharDB",
+    -- DevQueue.lua: the Raid Ledger Companion's probe queue (a JSON string), read only in dev mode
+    "RaidLedgerProbeQueue",
     "SLASH_LEDGERLINK1", "SLASH_LEDGERLINK2", "SlashCmdList",
 }
 

@@ -101,3 +101,122 @@ function Json.encode(value)
     encodeValue(value, out)
     return table.concat(out)
 end
+
+-- Decoder: only /rl dev reads JSON (the Raid Ledger Companion's probe queue,
+-- DevProbes.lua). Arrays come back marked with Json.array and `null` as
+-- Json.null, so Json.encode gives the same JSON (and byte count) back.
+local UNESCAPES = { ['"'] = '"', ["\\"] = "\\", ["/"] = "/", b = "\b", f = "\f", n = "\n", r = "\r", t = "\t" }
+local MAX_DEPTH = 32
+
+local function utf8Char(cp)
+    if cp < 0x80 then return string.char(cp) end
+    if cp < 0x800 then return string.char(0xC0 + math.floor(cp / 0x40), 0x80 + cp % 0x40) end
+    if cp < 0x10000 then
+        return string.char(0xE0 + math.floor(cp / 0x1000), 0x80 + math.floor(cp / 0x40) % 0x40, 0x80 + cp % 0x40)
+    end
+    return string.char(0xF0 + math.floor(cp / 0x40000), 0x80 + math.floor(cp / 0x1000) % 0x40,
+        0x80 + math.floor(cp / 0x40) % 0x40, 0x80 + cp % 0x40)
+end
+
+--- Decode a JSON text. Throws "LedgerLink JSON: ..." on anything malformed.
+function Json.decode(text)
+    if type(text) ~= "string" then error("LedgerLink JSON: not a string", 0) end
+    local pos = 1
+    local function fail(what) error(string.format("LedgerLink JSON: %s at byte %d", what, pos), 0) end
+    local function skip() pos = string.find(text, "[^ \t\r\n]", pos) or #text + 1 end
+    local function hex4(at)
+        local digits = string.sub(text, at, at + 3)
+        if not string.find(digits, "^%x%x%x%x$") then return nil end
+        return tonumber(digits, 16)
+    end
+
+    local function decodeString()
+        pos = pos + 1
+        local out = {}
+        while true do
+            local at = string.find(text, '[%z\1-\31"\\]', pos)
+            if not at then fail("unterminated string") end
+            out[#out + 1] = string.sub(text, pos, at - 1)
+            local c = string.sub(text, at, at)
+            if c == '"' then pos = at + 1 return table.concat(out) end
+            if c ~= "\\" then pos = at fail("raw control character in a string") end
+            local e = string.sub(text, at + 1, at + 1)
+            if UNESCAPES[e] then
+                out[#out + 1], pos = UNESCAPES[e], at + 2
+            elseif e == "u" then
+                local cp = hex4(at + 2)
+                if not cp then pos = at fail("bad \\u escape") end
+                pos = at + 6
+                local low = string.sub(text, pos, pos + 1) == "\\u" and hex4(pos + 2)
+                if cp >= 0xD800 and cp <= 0xDBFF and low and low >= 0xDC00 and low <= 0xDFFF then
+                    cp, pos = 0x10000 + (cp - 0xD800) * 0x400 + (low - 0xDC00), pos + 6
+                end
+                out[#out + 1] = utf8Char(cp)
+            else
+                pos = at fail("bad escape")
+            end
+        end
+    end
+
+    local decodeValue
+    local function decodeArray(depth)
+        local out = Json.array()
+        pos = pos + 1
+        skip()
+        if string.sub(text, pos, pos) == "]" then pos = pos + 1 return out end
+        while true do
+            out[#out + 1] = decodeValue(depth + 1)
+            skip()
+            local c = string.sub(text, pos, pos)
+            pos = pos + 1
+            if c == "]" then return out end
+            if c ~= "," then pos = pos - 1 fail("expected , or ]") end
+        end
+    end
+
+    local function decodeObject(depth)
+        local out = {}
+        pos = pos + 1
+        skip()
+        if string.sub(text, pos, pos) == "}" then pos = pos + 1 return out end
+        while true do
+            skip()
+            if string.sub(text, pos, pos) ~= '"' then fail("expected a string key") end
+            local key = decodeString()
+            skip()
+            if string.sub(text, pos, pos) ~= ":" then fail("expected :") end
+            pos = pos + 1
+            out[key] = decodeValue(depth + 1)
+            skip()
+            local c = string.sub(text, pos, pos)
+            pos = pos + 1
+            if c == "}" then return out end
+            if c ~= "," then pos = pos - 1 fail("expected , or }") end
+        end
+    end
+
+    decodeValue = function(depth)
+        if depth > MAX_DEPTH then fail("nested too deep") end
+        skip()
+        local c = string.sub(text, pos, pos)
+        if c == "{" then return decodeObject(depth) end
+        if c == "[" then return decodeArray(depth) end
+        if c == '"' then return decodeString() end
+        for literal, value in pairs({ ["true"] = true, ["false"] = false, null = Json.null }) do
+            if string.sub(text, pos, pos + #literal - 1) == literal then
+                pos = pos + #literal
+                return value
+            end
+        end
+        local number = string.match(text, "^-?%d+%.?%d*[eE]?[-+]?%d*", pos)
+        local n = number and tonumber(number)
+        if not n or n ~= n or n == math.huge or n == -math.huge then fail("unexpected character") end
+        pos = pos + #number
+        return n
+    end
+
+    local value = decodeValue(0)
+    skip()
+    if pos <= #text then fail("trailing characters") end
+    return value
+end
