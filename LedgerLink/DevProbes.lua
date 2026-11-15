@@ -393,7 +393,8 @@ local function stored()
     if not DevSnapshot.Enabled() then return nil end
     local dev = LedgerLinkDB.dev
     if type(dev.probes) ~= "table" then dev.probes = {} end
-    return dev.probes
+    if type(dev.probeExpiresAt) ~= "table" then dev.probeExpiresAt = {} end
+    return dev.probes, dev.probeExpiresAt
 end
 
 function DevProbes.Count()
@@ -402,16 +403,21 @@ function DevProbes.Count()
     return n
 end
 
---- Drop results no probe can still be waiting for (queued over 168 h ago, the longest TTL) and
---- anything malformed, then keep the newest RESULTS_MAX (ULIDs sort by time).
+local function expiresAt(entry) return DevProbes.QueuedAt(entry.probeId) + entry.ttlHours * 3600 end
+local function expired(entry, now) return now > expiresAt(entry) end
+
+--- Drop expired results (past their probe's ttlHours, kept in dev.probeExpiresAt when the result is
+--- stored; 168 h, the longest TTL, when that is unknown) and anything malformed, then keep the newest
+--- RESULTS_MAX (ULIDs sort by time).
 function DevProbes.Prune(now)
-    local probes = stored()
+    local probes, expires = stored()
     if not probes then return end
     now = now or time()
     local ids = {}
     for id, json in pairs(probes) do
         local at = DevProbes.QueuedAt(id)
-        if not at or type(json) ~= "string" or now > at + DevProbes.TTL_MAX_HOURS * 3600 then
+        local deadline = at and (tonumber(expires[id]) or at + DevProbes.TTL_MAX_HOURS * 3600)
+        if not at or type(json) ~= "string" or now > deadline then
             probes[id] = nil
         else
             ids[#ids + 1] = id
@@ -419,10 +425,9 @@ function DevProbes.Prune(now)
     end
     table.sort(ids)
     for i = 1, #ids - DevProbes.RESULTS_MAX do probes[ids[i]] = nil end
-end
-
-local function expired(entry, now)
-    return now > DevProbes.QueuedAt(entry.probeId) + entry.ttlHours * 3600
+    for id in pairs(expires) do
+        if probes[id] == nil then expires[id] = nil end
+    end
 end
 
 DevProbes.pending = {}
@@ -459,7 +464,8 @@ function DevProbes.Answer(entry)
         ns.Print("Dev probe " .. entry.probeId .. " failed: " .. (ok and "result over 64 KiB" or errorText(json)))
         return false
     end
-    probes[entry.probeId] = json
+    local _, expires = stored()
+    probes[entry.probeId], expires[entry.probeId] = json, expiresAt(entry)
     DevProbes.Prune()
     return true
 end

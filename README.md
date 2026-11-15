@@ -69,7 +69,7 @@ instead of asking you to paste `/rl probe`.
 the developer tunnel into the game: there is no separate probe addon. A
 developer queues a read-only probe (a short list of WoW API calls) through the
 Companion's dev bridge; the Companion writes it into `LedgerLink/DevQueue.lua`
-(shipped as an empty stub) as `RaidLedgerProbeQueue = [==[<JSON>]==]`. On each
+(shipped as an empty stub with no assignment) as `RaidLedgerProbeQueue = [==[<JSON>]==]`. On each
 load (login or `/reload`) **with dev mode on**, LedgerLink reads that JSON (as
 data, never as code; with dev mode off it is never read), and runs each probe
 not yet answered and still within its `ttlHours` after its `after` event
@@ -84,7 +84,7 @@ answered `denied` and never made. Name-bearing functions (`UnitGUID`,
 answer is `LedgerLinkDB.dev.probes[probeId]`, one dev-bridge/v1 `probe-result`
 JSON string: values nested at most 3 deep, ≤40 entries per table, ≤40 returns,
 each item ≤3 KiB and the whole ≤64 KiB (cut and marked `truncated`). At most 50
-are kept, newest first; one queued over 168 h ago (the longest TTL) is pruned.
+are kept: expired ones (past their probe's `ttlHours`) go first, then the oldest.
 The client writes SavedVariables only at logout or `/reload`, so a probe queued
 while you play is **run** after one `/reload` and **reaches the Companion** at
 the next one (or at logout); chat says how many were answered.

@@ -398,6 +398,7 @@ describe("/rl dev probes", function()
             assert.equal(0, ns.DevProbes.Count())
             fire(ns, "GUILD_ROSTER_UPDATE")
             assert.equal(1, ns.DevProbes.Count())
+            assert.equal(queuedAt + 72 * 3600, LedgerLinkDB.dev.probeExpiresAt[PROBE_ID])
             -- Next load: answered already, so nothing waits.
             assert.equal(0, ns.DevProbes.Load())
         end)
@@ -411,13 +412,20 @@ describe("/rl dev probes", function()
                     .. alphabet:sub(i % 32 + 1, i % 32 + 1) .. string.rep("0", 14)
                 ids[i], probes[id] = id, "{}"
             end
-            probes["01AAAAAAAA0000000000000000"] = "{}" -- queued long ago
+            probes["01AAAAAAAA0000000000000000"] = "{}" -- queued long ago, TTL unknown: 168 h applies
             probes["not-a-ulid"] = "{}"
             ns.DevProbes.Prune()
             assert.equal(50, ns.DevProbes.Count())
             assert.is_nil(probes[ids[10]])
             assert.is_string(probes[ids[11]])
             assert.is_string(probes[ids[60]])
+            -- A known TTL wins: past it, the result goes even though it is among the newest.
+            LedgerLinkDB.dev.probeExpiresAt[ids[60]] = queuedAt + 60
+            LedgerLinkDB.dev.probeExpiresAt["01AAAAAAAA0000000000000001"] = 1 -- no result: dropped
+            ns.DevProbes.Prune()
+            assert.is_nil(probes[ids[60]])
+            assert.equal(49, ns.DevProbes.Count())
+            assert.same({}, LedgerLinkDB.dev.probeExpiresAt)
         end)
     end)
 

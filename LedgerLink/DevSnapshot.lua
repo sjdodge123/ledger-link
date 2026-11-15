@@ -8,6 +8,7 @@
 --       snapshots  = { [<player guid>] = "<ledgerlink-snapshot JSON>" },
 --       capturedAt = { [<player guid>] = <unix s> }, -- drives the oldest-first trim
 --       probes     = { [<probeId>] = "<probe-result JSON>" }, -- DevProbes.lua
+--       probeExpiresAt = { [<probeId>] = <unix s> },          -- drives the expired-first prune
 --   }
 --
 -- The format is Raid Ledger's (dev-bridge/v1 `ledgerlink-snapshot`). The JSON
