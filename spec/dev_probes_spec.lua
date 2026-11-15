@@ -374,6 +374,19 @@ describe("/rl dev probes", function()
             assert.is_nil(r.calls[2].iterations)
         end)
 
+        it("keeps trailing nil returns as nulls (GetProfessions with unlearned slots)", function()
+            _G.GetBoom = function() return 7, nil, nil end
+            _G.GetCount = function() return nil end
+            devOn(queueOf({ probe({ call("profs", "GetBoom"), call("none", "GetCount") }) }))
+            fire(ns, "PLAYER_LOGIN")
+            local json, r = result()
+            assert.equal(3, #r.calls[1].values)
+            assert.same({ 7, dkjson.null, dkjson.null }, r.calls[1].values)
+            assert.same({ dkjson.null }, r.calls[2].values)
+            assert.is_nil(r.calls[1].truncated)
+            assertPinned("probe-result", { json }, "the nil returns")
+        end)
+
         it("missing, error and a non-number countFrom", function()
             _G.GetBoom = function() error("boom Player-4395-0ABCDEF0") end
             _G.GetCount = function() return "two" end

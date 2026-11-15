@@ -269,6 +269,8 @@ local function argList(args, i)
     return out, n
 end
 
+local function pack(...) return select("#", ...), { ... } end
+
 --- One call: { status, values?, error?, truncated?, first = raw first return }.
 local function invoke(path, args, i)
     local why = refusal(path) -- before EVERY call, loop iterations included
@@ -276,9 +278,10 @@ local function invoke(path, args, i)
     local found, fn = pcall(Probe.resolve, path)
     if not found or type(fn) ~= "function" then return { status = "missing" } end
     local argv, argc = argList(args, i)
-    local results = { pcall(fn, unpack(argv, 1, argc)) }
+    -- select("#") keeps trailing nils (GetProfessions() -> 7, nil, nil): they are JSON nulls.
+    local count, results = pack(pcall(fn, unpack(argv, 1, argc)))
     if not results[1] then return { status = "error", error = errorText(results[2]) } end
-    local n = table.maxn(results) - 1
+    local n = count - 1
     local redact = REDACT[path]
     if redact then
         for _, slot in ipairs(redact.returns) do
